@@ -7,9 +7,13 @@
   "type": "module",
   "module": "index.ts",
   "scripts": {
+    "format": "oxfmt . --write",
+    "format:check": "oxfmt . --check",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix",
     "typecheck": "tsc --noEmit",
-    "dev:local-mcp": "bun run packages/local-mcp/src/index.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev:local-mcp": "bun run packages/local-mcp/src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
