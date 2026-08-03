@@ -1,21 +1,24 @@
 {
-    "name": "memory-engine",
-    "private": true,
-    "workspaces": [
-        "packages/*"
-    ],
-    "type": "module",
-    "module": "index.ts",
-    "scripts": {
-        "typecheck": "tsc --noEmit",
-        "dev:local-mcp": "bun run packages/local-mcp/src/index.ts"
-    },
-    "devDependencies": {
-        "@types/bun": "latest",
-        "oxfmt": "^0.62.0",
-        "oxlint": "^1.77.0"
-    },
-    "peerDependencies": {
-        "typescript": "^5"
-    }
+  "name": "memory-engine",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "module": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev:local-mcp": "bun run packages/local-mcp/src/index.ts",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.77.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
 }
