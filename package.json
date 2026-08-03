@@ -1,0 +1,21 @@
+{
+    "name": "memory-engine",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "type": "module",
+    "module": "index.ts",
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "dev:local-mcp": "bun run packages/local-mcp/src/index.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "oxfmt": "^0.62.0",
+        "oxlint": "^1.77.0"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
+}
