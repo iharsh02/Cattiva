@@ -12,6 +12,7 @@
     "@huggingface/transformers": "^4.2.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "ai": "^7.0.48",
+    "sqlite-vec": "^0.1.9",
     "tsx": "^4.23.5",
     "zod": "^4.4.3"
   },
