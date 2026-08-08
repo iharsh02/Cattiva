@@ -35,7 +35,7 @@ per-project instead.
 
 ## Skills
 
-Optional [skills](.claude/skills) for maintaining your memories.
+Optional [skills](skills) for maintaining your memories.
 
 | Skill                                   | What it does                                                                                           |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------ |

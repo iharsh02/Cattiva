@@ -38,3 +38,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # build output
 dist/
+
+# local Claude Code config (skills live in skills/)
+.claude/
