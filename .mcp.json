@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "bun",
+      "args": ["run", "packages/memory-engine/src/index.ts"],
+      "env": {
+        "CATTIVA_MEMORY_DB": ".memory/memory.db"
+      }
+    }
+  }
+}

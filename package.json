@@ -1,6 +1,12 @@
 {
-  "name": "memory-engine",
+  "name": "cattiva",
   "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "iharsh02 <ht266005@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iharsh02/cattiva.git"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -13,7 +19,8 @@
     "lint:fix": "oxlint . --fix",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "dev:local-mcp": "bun run packages/local-mcp/src/index.ts"
+    "dev:memory-engine": "bun run packages/memory-engine/src/index.ts",
+    "release:memory-engine": "bun run --filter @cattiva/memory-engine pack:dry"
   },
   "devDependencies": {
     "@types/bun": "latest",

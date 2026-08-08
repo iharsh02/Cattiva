@@ -43,12 +43,13 @@ const OVERFETCH = 5;
 const REBUILD_BATCH = 64;
 
 /** stdout is the JSON-RPC channel — writing there corrupts the protocol. */
-const warn = (msg: string) => console.error(`[memory-engine] ${msg}`);
+const warn = (msg: string) => console.error(`[cattiva:memory] ${msg}`);
 
 const newId = (): MemoryId => `mem_${Date.now().toString(36)}${crypto.randomUUID().slice(0, 4)}`;
 
+/** `~/.cattiva/` is shared across toolkits; each owns its own file inside it. */
 export const defaultDbPath = (): string =>
-  process.env.MEMORY_ENGINE_DB ?? join(homedir(), ".memory-engine", "memory.db");
+  process.env.CATTIVA_MEMORY_DB ?? join(homedir(), ".cattiva", "memory.db");
 
 /**
  * The paper is ambiguous: `Add_memory` takes a top-level `memory_type`, but its

@@ -1,13 +1,33 @@
+#!/usr/bin/env bun
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import * as z from "zod/v4";
+import {
+  addMemoryInput,
+  deleteMemoryInput,
+  retrieveMemoryInput,
+  updateMemoryInput,
+} from "./schema.ts";
+import { openStore, type MemoryStore, type SearchHit } from "./store.ts";
+
+const text = (body: string) => ({ content: [{ type: "text" as const, text: body }] });
+const failure = (body: string) => ({ ...text(body), isError: true });
+
+let store: MemoryStore | undefined;
+const getStore = (): MemoryStore => (store ??= openStore());
+
+/** Each line carries the id, because update and delete are unreachable without it. */
+const formatHits = (hits: SearchHit[]): string => {
+  if (hits.length === 0) return "No memories matched.";
+  const lines = hits.map(
+    (h) =>
+      `[${h.memory.id}] (${h.similarity.toFixed(2)})${h.memory.memoryType === undefined ? "" : ` <${h.memory.memoryType}>`} ${h.memory.content}`,
+  );
+  return `${hits.length} ${hits.length === 1 ? "memory" : "memories"}:\n${lines.join("\n")}`;
+};
 
 function createServer(): McpServer {
   const server = new McpServer(
-    {
-      name: "memory-engine",
-      version: "1.0.0",
-    },
+    { name: "memory-engine", version: "1.0.0" },
     { capabilities: { tools: {} } },
   );
 
@@ -15,26 +35,17 @@ function createServer(): McpServer {
     "add_memory",
     {
       title: "Add memory",
-      description: "Store a fact in the memory engine.",
-      inputSchema: z.object({
-        content: z.string().describe("The fact to remember"),
-        metadata: z
-          .record(z.string(), z.unknown())
-          .optional()
-          .describe("Optional arbitrary metadata to attach to the memory"),
-      }),
+      description:
+        "Store a single fact in long-term memory so it survives into later, separate conversations. Use this for durable information — preferences, decisions, project conventions, identities — not for details that only matter right now.",
+      inputSchema: addMemoryInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
-    async ({ content, metadata }) => {
-      // TODO: persist to the memory store and return the generated id
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Stored: ${content}${metadata ? ` ${JSON.stringify(metadata)}` : ""}`,
-          },
-        ],
-      };
+    async ({ content, metadata, memory_type }) => {
+      const id = await getStore().add(content, {
+        ...(memory_type === undefined ? {} : { memoryType: memory_type }),
+        ...(metadata === undefined ? {} : { metadata }),
+      });
+      return text(`Stored as ${id}`);
     },
   );
 
@@ -42,28 +53,14 @@ function createServer(): McpServer {
     "retrieve_memory",
     {
       title: "Retrieve memory",
-      description: "Semantic search over stored memories.",
-      inputSchema: z.object({
-        query: z.string().describe("The query to search for"),
-        top_k: z
-          .number()
-          .int()
-          .positive()
-          .default(5)
-          .describe("Maximum number of memories to return"),
-      }),
+      description:
+        "Search long-term memory and bring relevant entries into the conversation. Call this before answering anything that may depend on facts established earlier. Each result begins with its memory_id, which update_memory and delete_memory require.",
+      inputSchema: retrieveMemoryInput,
       annotations: { readOnlyHint: true },
     },
-    async ({ query, top_k }) => {
-      // TODO: embed the query and run a similarity search against the store
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Top ${top_k} results for: ${query}`,
-          },
-        ],
-      };
+    async ({ query, top_k, metadata_filter }) => {
+      const hits = await getStore().search(query, top_k, metadata_filter);
+      return text(formatHits(hits));
     },
   );
 
@@ -71,23 +68,16 @@ function createServer(): McpServer {
     "update_memory",
     {
       title: "Update memory",
-      description: "Replace the content of an existing memory.",
-      inputSchema: z.object({
-        id: z.string().describe("Id of the memory to update"),
-        content: z.string().describe("The new content to replace it with"),
-      }),
+      description:
+        "Replace the content of an existing memory. Use this when a stored fact has changed, rather than adding a second contradictory memory. Requires a memory_id from a previous retrieve_memory call.",
+      inputSchema: updateMemoryInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
-    async ({ id, content }) => {
-      // TODO: look up `id`, re-embed the new content, and write it back
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Updated ${id}: ${content}`,
-          },
-        ],
-      };
+    async ({ memory_id, content, metadata }) => {
+      const updated = await getStore().update(memory_id, content, metadata);
+      return updated
+        ? text(`Updated ${memory_id}`)
+        : failure(`No memory with id ${memory_id}. Call retrieve_memory to get valid ids.`);
     },
   );
 
@@ -95,22 +85,21 @@ function createServer(): McpServer {
     "delete_memory",
     {
       title: "Delete memory",
-      description: "Remove a memory from the store.",
-      inputSchema: z.object({
-        id: z.string().describe("Id of the memory to delete"),
-      }),
+      description:
+        "Permanently remove a memory. Use this when a stored fact is wrong or obsolete. Requires a memory_id from a previous retrieve_memory call and explicit confirmation.",
+      inputSchema: deleteMemoryInput,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     },
-    async ({ id }) => {
-      // TODO: delete from the memory store
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Deleted ${id}`,
-          },
-        ],
-      };
+    async ({ memory_id, confirmation }) => {
+      // A false confirmation is a well-formed call we decline, distinct from a
+      // malformed one — the model's correct next step differs between the two.
+      if (!confirmation) {
+        return failure(`Not deleted: confirmation was false. Set confirmation to true to delete.`);
+      }
+      const removed = await getStore().remove(memory_id);
+      return removed
+        ? text(`Deleted ${memory_id}`)
+        : failure(`No memory with id ${memory_id}. Call retrieve_memory to get valid ids.`);
     },
   );
 

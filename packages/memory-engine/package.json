@@ -1,25 +1,52 @@
 {
-  "name": "local-mcp",
-  "private": true,
+  "name": "@cattiva/memory-engine",
+  "version": "0.1.0",
+  "description": "Long-term memory for AI agents, exposed over MCP.",
+  "keywords": [
+    "agent",
+    "claude",
+    "embeddings",
+    "mcp",
+    "memory",
+    "sqlite-vec"
+  ],
+  "license": "GPL-3.0-or-later",
+  "author": "iharsh02 <ht266005@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iharsh02/cattiva.git"
+  },
+  "bin": {
+    "memory-engine": "dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
-  "module": "index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "pack:dry": "bun run build && bun pm pack --dry-run",
+    "prepack": "bun run build",
+    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "dependencies": {
-    "@ai-sdk/react": "^4.0.51",
     "@browser-ai/transformers-js": "^3.0.0",
     "@huggingface/transformers": "^4.2.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "ai": "^7.0.48",
     "sqlite-vec": "^0.1.9",
-    "tsx": "^4.23.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
+    "@types/bun": "latest",
+    "tsdown": "^0.22.14",
     "typescript": "^5"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
   }
 }
