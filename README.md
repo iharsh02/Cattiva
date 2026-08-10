@@ -33,6 +33,25 @@ memory downloads a ~25MB embedding model, then works offline.
 By default memories live in `~/.cattiva/memory.db`. Set `CATTIVA_MEMORY_DB` to keep them
 per-project instead.
 
+## Retrieval quality
+
+Retrieval is measured, not asserted. The [eval](packages/memory-engine/eval) runs against
+[LoCoMo](https://github.com/snap-research/locomo) — 10 multi-session conversations, 5,882
+turns, 1,977 questions with hand-labelled evidence:
+
+| | hit@1 | hit@3 | recall@3 | hit@10 | recall@10 | MRR |
+| ---------------------------- | ----- | ----- | -------- | ------ | --------- | ----- |
+| `Xenova/bge-small-en-v1.5` | 0.282 | 0.452 | 0.407 | 0.637 | 0.582 | 0.389 |
+
+Two decisions came out of it. `retrieve_memory` defaults to **`top_k=10`**, not the 3 the
+paper uses — measured on LoCoMo the right memory is in the top 3 for 45% of questions but
+in the top 10 for 64%, and hosts here have the context to spare. And the embedding model is
+`bge-small-en-v1.5`, which beat every alternative tried at the smallest size.
+
+Run it yourself with `bun run eval:memory-engine`. See the
+[eval README](packages/memory-engine/eval/README.md) for the method, the per-category
+breakdown, and what the numbers do not cover.
+
 ## Skills
 
 Optional [skills](skills) for maintaining your memories.
