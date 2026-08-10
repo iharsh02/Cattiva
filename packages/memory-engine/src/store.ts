@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
+import { defaultDbPath } from "./config.ts";
 import { embedder } from "./embedder.ts";
 import {
   CREATE_MEMORIES,
@@ -46,10 +46,6 @@ const REBUILD_BATCH = 64;
 const warn = (msg: string) => console.error(`[cattiva:memory] ${msg}`);
 
 const newId = (): MemoryId => `mem_${Date.now().toString(36)}${crypto.randomUUID().slice(0, 4)}`;
-
-/** `~/.cattiva/` is shared across toolkits; each owns its own file inside it. */
-export const defaultDbPath = (): string =>
-  process.env.CATTIVA_MEMORY_DB ?? join(homedir(), ".cattiva", "memory.db");
 
 /**
  * The paper is ambiguous: `Add_memory` takes a top-level `memory_type`, but its
@@ -188,7 +184,7 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
 
     async search(query, topK, filter) {
       await ensureIndex();
-      const [queryVector] = await embedder.embed([query]);
+      const [queryVector] = await embedder.embedQuery([query]);
       if (!queryVector) return [];
 
       const { typeFilter, rest, hasRest } = splitFilter(filter);
