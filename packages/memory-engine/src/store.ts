@@ -104,7 +104,7 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
     db.run("INSERT INTO vec_memories (memory_id, embedding, memory_type) VALUES (?, ?, ?)", [
       id,
       new Float32Array(vector),
-      memoryType,
+      memoryType ?? "",
     ]);
   const deleteVec = (id: string) => db.run("DELETE FROM vec_memories WHERE memory_id = ?", [id]);
 
