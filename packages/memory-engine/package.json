@@ -29,9 +29,12 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
+    "eval": "bun run eval/locomo.ts",
+    "eval:save": "bun run eval/locomo.ts --save",
     "pack:dry": "bun run build && bun pm pack --dry-run",
     "prepack": "bun run build",
-    "prepublishOnly": "bun run typecheck && bun run build"
+    "prepublishOnly": "bun run typecheck && bun run build",
+    "eval:compare": "bun run eval/compare.ts"
   },
   "dependencies": {
     "@browser-ai/transformers-js": "^3.0.0",

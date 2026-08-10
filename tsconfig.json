@@ -2,5 +2,5 @@
   // Whole-workspace config: `bunx tsc --noEmit` from the repo root checks every package.
   // Per-package configs extend tsconfig.base.json and scope checks to one package.
   "extends": "./tsconfig.base.json",
-  "include": ["packages/*/src/**/*", "*.ts"]
+  "include": ["packages/*/src/**/*", "packages/*/eval/**/*", "*.ts"]
 }

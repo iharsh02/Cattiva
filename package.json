@@ -20,7 +20,10 @@
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
     "dev:memory-engine": "bun run packages/memory-engine/src/index.ts",
-    "release:memory-engine": "bun run --filter @cattiva/memory-engine pack:dry"
+    "eval:memory-engine": "bun run --filter @cattiva/memory-engine eval",
+    "eval:memory-engine:save": "bun run --filter @cattiva/memory-engine eval:save",
+    "release:memory-engine": "bun run --filter @cattiva/memory-engine pack:dry",
+    "eval:memory-engine:compare": "bun run --filter @cattiva/memory-engine eval:compare"
   },
   "devDependencies": {
     "@types/bun": "latest",
