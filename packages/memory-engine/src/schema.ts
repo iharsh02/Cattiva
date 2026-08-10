@@ -37,17 +37,14 @@ export const retrieveMemoryInput = z.strictObject({
     .describe(
       "Describe the information you need in natural language. Phrase it like the fact you hope to find, not as keywords.",
     ),
-  // Paper default is 3. `.max()` is a crash guard, not a policy limit — how many
-  // memories to pull is behaviour P_penalty is meant to shape, so keep it loose
-  // enough that it never binds in normal use.
   top_k: z
     .number()
     .int()
     .positive()
     .max(100)
-    .default(3)
+    .default(10)
     .describe(
-      "How many memories to retrieve. Keep this small — retrieving more than you need wastes context.",
+      "How many memories to retrieve. Ten is a good default; lower it only when you want one specific fact.",
     ),
   metadata_filter: metadata
     .optional()
