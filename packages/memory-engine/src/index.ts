@@ -7,6 +7,7 @@ import {
   retrieveMemoryInput,
   updateMemoryInput,
 } from "./schema.ts";
+import type { Memory } from "./memory.ts";
 import { openStore, type MemoryStore, type SearchHit } from "./store.ts";
 
 const text = (body: string) => ({ content: [{ type: "text" as const, text: body }] });
@@ -22,12 +23,27 @@ const getStore = (): MemoryStore => (store ??= openStore());
  */
 const formatScore = (n: number): string => (n >= 0.01 ? n.toFixed(2) : n.toPrecision(2));
 
+/**
+ * When the fact was last asserted, and when it was first stored if those differ.
+ *
+ * Memories contradict each other as things change — a database chosen in March and
+ * replaced in June — and nothing in the content says which one is current. The dates
+ * are stored either way; omitting them made the stale memory look exactly as current
+ * as the true one. Ranking cannot settle this and should not try: the model reading
+ * both is the thing that knows March precedes June.
+ */
+const formatDate = (memory: Memory): string => {
+  const created = memory.createdAt.slice(0, 10);
+  const updated = memory.updatedAt.slice(0, 10);
+  return created === updated ? created : `${created}->${updated}`;
+};
+
 /** Each line carries the id, because update and delete are unreachable without it. */
 const formatHits = (hits: SearchHit[]): string => {
   if (hits.length === 0) return "No memories matched.";
   const lines = hits.map(
     (h) =>
-      `[${h.memory.id}] (${formatScore(h.similarity)})${h.memory.memoryType === undefined ? "" : ` <${h.memory.memoryType}>`} ${h.memory.content}`,
+      `[${h.memory.id}] ${formatDate(h.memory)} (${formatScore(h.similarity)})${h.memory.memoryType === undefined ? "" : ` <${h.memory.memoryType}>`} ${h.memory.content}`,
   );
   return `${hits.length} ${hits.length === 1 ? "memory" : "memories"}:\n${lines.join("\n")}`;
 };
@@ -61,7 +77,7 @@ function createServer(): McpServer {
     {
       title: "Retrieve memory",
       description:
-        "Search long-term memory and bring relevant entries into the conversation. Call this before answering anything that may depend on facts established earlier. Each result begins with its memory_id, which update_memory and delete_memory require.",
+        "Search long-term memory and bring relevant entries into the conversation. Call this before answering anything that may depend on facts established earlier. Each result is `[memory_id] date (score) <type> content`; update_memory and delete_memory need the memory_id. Two results may contradict each other because the fact changed — prefer the later date, and a date shown as `first->latest` means that entry was revised.",
       inputSchema: retrieveMemoryInput,
       annotations: { readOnlyHint: true },
     },
