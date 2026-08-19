@@ -10,6 +10,14 @@
  *   bun run packages/memory-engine/eval/locomo.ts --limit 2   first 2 conversations
  *   bun run packages/memory-engine/eval/locomo.ts --save
  *
+ * It measures the shipping pipeline, not a copy of it: every question goes through
+ * `store.search()` exactly as the MCP tool does, with caching embedder and reranker
+ * injected. Ablations are the product's own env vars, so a setting that scores well
+ * here is a setting a user can actually turn on:
+ *
+ *   CATTIVA_RERANK=0                                        no cross-encoder
+ *   CATTIVA_CANDIDATE_POOL=200 CATTIVA_RERANK_DEPTH=100     wider pool and shortlist
+ *
  * One store per conversation — questions are scoped to their own conversation,
  * so pooling them would invent distractors the labels never accounted for.
  *
@@ -18,8 +26,12 @@
  * retrieval layer honestly; it does not measure the whole product.
  */
 import { join } from "node:path";
-import { embedder } from "../src/embedder.ts";
+import { embedder, type Embedder } from "../src/embedder.ts";
+import { CANDIDATE_POOL, RERANK_DEPTH, RERANK_ENABLED, RERANK_MODEL } from "../src/config.ts";
+import { reranker } from "../src/reranker.ts";
 import { openStore } from "../src/store.ts";
+import { cachedEmbedder } from "./cache.ts";
+import { cachedReranker } from "./rerank-cache.ts";
 import {
   byClass,
   scoreQuestion,
@@ -32,6 +44,8 @@ import {
 const TOP_K = 10;
 const DATA = join(import.meta.dir, "data", "locomo10.json");
 const BASELINE = join(import.meta.dir, "baseline.json");
+const CACHE = join(import.meta.dir, "data", "embed-cache.db");
+const RERANK_CACHE = join(import.meta.dir, "data", "rerank-cache.db");
 
 /** LoCoMo's numeric categories, per the paper. */
 const CATEGORY: Record<number, string> = {
@@ -90,28 +104,56 @@ const sessionTurns = (c: Conversation): Turn[] =>
     .filter(([k, v]) => k.startsWith("session_") && !k.includes("date") && Array.isArray(v))
     .flatMap(([, v]) => v as Turn[]);
 
+/**
+ * Vectors are cached across runs, keyed by (model, doc|query, sha256(text)). Changing
+ * how results are *ranked* does not change a single embedding, and that is the loop
+ * this eval mostly runs in. `--no-cache` forces a cold run.
+ */
+const noCache = process.argv.includes("--no-cache");
+
+/**
+ * Cross-encoder scores are cached too, keyed by (model, sha256(query), sha256(doc)).
+ * Reranking is by far the slowest stage — a full uncached run is ~400s against ~10s
+ * warm — and, like the vectors, none of it changes when only the ranking does.
+ */
+const rerankCache = noCache ? undefined : cachedReranker(reranker, RERANK_CACHE);
+const cache = noCache ? undefined : cachedEmbedder(embedder, CACHE);
+const active: Embedder = cache ?? embedder;
+
 const scored: Scored[] = [];
 let skipped = 0;
+const startedAt = Bun.nanoseconds();
 
 for (const [i, conv] of conversations.entries()) {
   const turns = sessionTurns(conv);
   const known = new Set(turns.map((t) => t.dia_id));
+  const texts = turns.map(turnText);
 
-  const store = openStore(":memory:");
-  const keyById = new Map<string, string>();
-  for (const t of turns) {
-    keyById.set(await store.add(turnText(t)), t.dia_id);
+  // A handful of evidence ids point at turns the dataset does not ship.
+  const asks = conv.qa.map((qa) => ({
+    qa,
+    expect: (qa.evidence ?? []).filter((e) => known.has(e)),
+  }));
+  const askable = asks.filter((a) => a.expect.length > 0);
+  skipped += asks.length - askable.length;
+
+  // One batched pass over each side, purely to fill the cache — measured, batch 64 is
+  // ~1.7x batch 1 on CPU. The store keeps its one-at-a-time API and every call below
+  // is then a cache hit.
+  if (cache !== undefined) {
+    await cache.embed(texts);
+    await cache.embedQuery(askable.map((a) => a.qa.question));
   }
 
-  for (const qa of conv.qa) {
-    // A handful of evidence ids point at turns the dataset does not ship.
-    const expect = (qa.evidence ?? []).filter((e) => known.has(e));
-    if (expect.length === 0) {
-      skipped++;
-      continue;
-    }
+  const store = openStore(":memory:", active, rerankCache ?? reranker);
+  const keyById = new Map<string, string>();
+  for (const [j, t] of turns.entries()) {
+    keyById.set(await store.add(texts[j]!), t.dia_id);
+  }
+
+  for (const { qa, expect } of askable) {
     const hits = await store.search(qa.question, TOP_K);
-    const results: Result[] = hits.map((h) => ({
+    const results: Result[] = hits.slice(0, TOP_K).map((h) => ({
       key: keyById.get(h.memory.id) ?? "?",
       similarity: h.similarity,
     }));
@@ -129,6 +171,8 @@ for (const [i, conv] of conversations.entries()) {
   );
 }
 
+const elapsed = (Bun.nanoseconds() - startedAt) / 1e9;
+
 // ----------------------------------------------------------------- report
 
 const overall = summarise(scored);
@@ -143,6 +187,25 @@ console.log(`model: ${embedder.id} (${embedder.dimensions}d)`);
 console.log(
   `${conversations.length} conversations, ${scored.length} questions scored, ${skipped} skipped (no resolvable evidence), top_k=${TOP_K}`,
 );
+if (cache === undefined) {
+  console.log(`${elapsed.toFixed(1)}s, cache disabled`);
+} else {
+  const { hits, misses } = cache.stats();
+  const total = hits + misses;
+  const rate = total === 0 ? 0 : hits / total;
+  console.log(
+    `${elapsed.toFixed(1)}s, cache ${(rate * 100).toFixed(0)}% hit (${hits} hit, ${misses} embedded)`,
+  );
+}
+if (RERANK_ENABLED) {
+  const rs = rerankCache?.stats() ?? { hits: 0, misses: 0 };
+  console.log(
+    `reranker: ${RERANK_MODEL}, pool=${CANDIDATE_POOL}, depth=${RERANK_DEPTH}, ` +
+      `cache ${rs.hits} hit / ${rs.misses} scored`,
+  );
+} else {
+  console.log(`reranker: off (CATTIVA_RERANK=0)`);
+}
 if (prev === undefined) console.log(`no baseline for this model — run with --save to record one`);
 
 console.log(`\n── overall ──\n`);
@@ -174,4 +237,6 @@ if (process.argv.includes("--save")) {
   await Bun.write(BASELINE, `${JSON.stringify(next, null, 2)}\n`);
   console.log(`\nbaseline for ${embedder.id} written to ${BASELINE}`);
 }
+cache?.close();
+rerankCache?.close();
 console.log();
