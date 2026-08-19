@@ -168,25 +168,40 @@ export function openStore(
     ]);
   const deleteVec = (id: string) => db.run("DELETE FROM vec_memories WHERE memory_id = ?", [id]);
 
+  /**
+   * Embed everything first, then swap the index in a single transaction.
+   *
+   * The writes used to be one transaction per batch, interleaved with `await`. Two
+   * clients on the same file — Claude Code and another host — would both drop and
+   * refill the table at once, collide on the primary key, and fail one of them mid
+   * search. One transaction makes SQLite serialise them: the loser waits, then
+   * rewrites identical vectors. It also means a crash part-way rolls back instead of
+   * leaving a half-filled index, and it keeps the lock held only for the writes
+   * rather than for the embedding.
+   *
+   * The cost is holding every vector in memory for the duration, ~15MB per 10k
+   * memories. Only an embedder change triggers this.
+   */
   async function rebuildIndex(): Promise<number> {
-    db.run(DROP_VEC_MEMORIES);
-    db.run(CREATE_VEC_MEMORIES);
-
     const rows = db
       .prepare<{ id: string; content: string; memory_type: string | null }, []>(
         "SELECT id, content, memory_type FROM memories ORDER BY created_at",
       )
       .all();
 
+    const vectors: number[][] = [];
     for (let i = 0; i < rows.length; i += REBUILD_BATCH) {
       const batch = rows.slice(i, i + REBUILD_BATCH);
-      const vectors = await embedder.embed(batch.map((r) => r.content));
-      db.transaction(() => {
-        batch.forEach((r, j) => insertVec(r.id, vectors[j]!, r.memory_type));
-      })();
+      vectors.push(...(await embedder.embed(batch.map((r) => r.content))));
     }
 
-    writeMeta.run("embedder_id", embedder.id);
+    db.transaction(() => {
+      db.run(DROP_VEC_MEMORIES);
+      db.run(CREATE_VEC_MEMORIES);
+      rows.forEach((r, j) => insertVec(r.id, vectors[j]!, r.memory_type));
+      writeMeta.run("embedder_id", embedder.id);
+    }).immediate();
+
     if (rows.length > 0) warn(`rebuilt vector index for ${rows.length} memories`);
     return rows.length;
   }
