@@ -76,8 +76,3 @@ export const deleteMemoryInput = z.strictObject({
       "Must be true to proceed. Set this only when you are certain the memory should be permanently removed.",
     ),
 });
-
-export type AddMemoryInput = z.infer<typeof addMemoryInput>;
-export type RetrieveMemoryInput = z.infer<typeof retrieveMemoryInput>;
-export type UpdateMemoryInput = z.infer<typeof updateMemoryInput>;
-export type DeleteMemoryInput = z.infer<typeof deleteMemoryInput>;

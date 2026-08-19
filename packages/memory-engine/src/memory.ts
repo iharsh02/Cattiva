@@ -89,5 +89,3 @@ export const CREATE_STORE_META = `
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`;
-
-export const SCHEMA_VERSION = "1";
