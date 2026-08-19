@@ -69,6 +69,20 @@ export const CREATE_VEC_MEMORIES = `
 
 export const DROP_VEC_MEMORIES = `DROP TABLE IF EXISTS vec_memories`;
 
+/**
+ * Lexical candidate source for hybrid retrieval. Derived data, like `vec_memories`:
+ * `memories` stays the source of truth and this can be rebuilt from it at any time.
+ *
+ * Porter stemming makes "retrieving" match "retrieve"; unicode61 keeps identifiers
+ * and non-ASCII text usable without another tokenizer dependency.
+ */
+export const CREATE_MEMORIES_FTS = `
+  CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+    memory_id UNINDEXED,
+    content,
+    tokenize='porter unicode61'
+  )`;
+
 /** `embedder_id` is store-level, not per-row: every vector must share one embedding space. */
 export const CREATE_STORE_META = `
   CREATE TABLE IF NOT EXISTS store_meta (

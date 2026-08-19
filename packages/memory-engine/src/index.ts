@@ -15,12 +15,19 @@ const failure = (body: string) => ({ ...text(body), isError: true });
 let store: MemoryStore | undefined;
 const getStore = (): MemoryStore => (store ??= openStore());
 
+/**
+ * Two significant figures, not two decimal places. Cross-encoder relevance spans
+ * orders of magnitude and is small in absolute terms even for good matches, so
+ * fixed decimals print `0.00` for every result and hide the ranking entirely.
+ */
+const formatScore = (n: number): string => (n >= 0.01 ? n.toFixed(2) : n.toPrecision(2));
+
 /** Each line carries the id, because update and delete are unreachable without it. */
 const formatHits = (hits: SearchHit[]): string => {
   if (hits.length === 0) return "No memories matched.";
   const lines = hits.map(
     (h) =>
-      `[${h.memory.id}] (${h.similarity.toFixed(2)})${h.memory.memoryType === undefined ? "" : ` <${h.memory.memoryType}>`} ${h.memory.content}`,
+      `[${h.memory.id}] (${formatScore(h.similarity)})${h.memory.memoryType === undefined ? "" : ` <${h.memory.memoryType}>`} ${h.memory.content}`,
   );
   return `${hits.length} ${hits.length === 1 ? "memory" : "memories"}:\n${lines.join("\n")}`;
 };

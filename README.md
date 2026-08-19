@@ -28,7 +28,8 @@ Requires [Bun](https://bun.com). Add to your MCP config — `.mcp.json` for Clau
 ```
 
 Restart your agent. Nothing else to install — no database to run, no API key. The first
-memory downloads a ~25MB embedding model, then works offline.
+memory downloads a ~25MB embedding model and the first search a ~23MB reranker, then it
+works offline. Nothing you store leaves the machine.
 
 By default memories live in `~/.cattiva/memory.db`. Set `CATTIVA_MEMORY_DB` to keep them
 per-project instead.
@@ -39,14 +40,26 @@ Retrieval is measured, not asserted. The [eval](packages/memory-engine/eval) run
 [LoCoMo](https://github.com/snap-research/locomo) — 10 multi-session conversations, 5,882
 turns, 1,977 questions with hand-labelled evidence:
 
-| | hit@1 | hit@3 | recall@3 | hit@10 | recall@10 | MRR |
-| ---------------------------- | ----- | ----- | -------- | ------ | --------- | ----- |
-| `Xenova/bge-small-en-v1.5` | 0.282 | 0.452 | 0.407 | 0.637 | 0.582 | 0.389 |
+| stage                      | hit@1     | hit@3 | recall@3 | hit@10 | recall@10 | MRR   |
+| -------------------------- | --------- | ----- | -------- | ------ | --------- | ----- |
+| dense vectors only         | 0.282     | 0.452 | 0.407    | 0.637  | 0.582     | 0.389 |
+| \+ hybrid lexical search   | 0.337     | 0.536 | 0.484    | 0.713  | 0.655     | 0.455 |
+| \+ cross-encoder reranking | **0.496** | 0.662 | 0.604    | 0.772  | **0.718** | 0.590 |
 
-Two decisions came out of it. `retrieve_memory` defaults to **`top_k=10`**, not the 3 the
-paper uses — measured on LoCoMo the right memory is in the top 3 for 45% of questions but
-in the top 10 for 64%, and hosts here have the context to spare. And the embedding model is
-`bge-small-en-v1.5`, which beat every alternative tried at the smallest size.
+**The right memory comes back first 50% of the time, up from 28%.** Three decisions came
+out of the measurements:
+
+- **Hybrid retrieval.** Dense vectors cannot match a name the model has never seen, so
+  SQLite FTS5 runs alongside them and the two rankings are fused.
+- **Reranking is on by default.** A ~23MB cross-encoder re-reads the top 30 candidates and
+  reorders them, worth +0.16 `hit@1` for roughly 200ms per retrieval. `CATTIVA_RERANK=0`
+  turns it off.
+- **`retrieve_memory` returns `top_k=10`**, not the 3 the paper uses — hosts here have the
+  context to spare, and it is worth 11 points of recall.
+
+Measured and _not_ taken: widening the candidate pool. Fetching 4x more candidates moved
+the top answer for one question in 1,977, which is how we know the cross-encoder's
+judgement — not the size of the search — is what limits this now.
 
 Run it yourself with `bun run eval:memory-engine`. See the
 [eval README](packages/memory-engine/eval/README.md) for the method, the per-category

@@ -2,10 +2,17 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import * as sqliteVec from "sqlite-vec";
-import { defaultDbPath } from "./config.ts";
-import { embedder } from "./embedder.ts";
+import { CANDIDATE_POOL, RERANK_DEPTH, RERANK_ENABLED, defaultDbPath } from "./config.ts";
+import { embedder as defaultEmbedder, type Embedder } from "./embedder.ts";
+import {
+  type Reranker,
+  relevanceProbability,
+  rerank,
+  reranker as defaultReranker,
+} from "./reranker.ts";
 import {
   CREATE_MEMORIES,
+  CREATE_MEMORIES_FTS,
   CREATE_STORE_META,
   CREATE_VEC_MEMORIES,
   DROP_VEC_MEMORIES,
@@ -16,8 +23,29 @@ import {
   type MemoryMetadata,
   type MemoryRow,
 } from "./memory.ts";
+import {
+  lexicalQuery,
+  normaliseRrfScore,
+  reciprocalRankFuse,
+  type CandidateRanks,
+} from "./retrieval.ts";
 
-export type SearchHit = { memory: Memory; similarity: number };
+export type SearchHit = {
+  memory: Memory;
+  /**
+   * Relevance in 0-1, descending — always consistent with the order of the results.
+   *
+   * Its *meaning* depends on the pipeline, so do not compare across configurations:
+   * with reranking on it is the cross-encoder's relevance probability for this
+   * query and memory; with it off it is a normalised rank-fusion score, which is an
+   * artefact of rank positions rather than a similarity.
+   */
+  similarity: number;
+  /** Which candidate sources contributed to this result's rank. */
+  sources: Array<"dense" | "lexical">;
+};
+
+export type RetrievalCandidates = CandidateRanks<Memory>;
 
 export interface MemoryStore {
   add(
@@ -31,21 +59,28 @@ export interface MemoryStore {
   update(id: MemoryId, content: string, metadata?: MemoryMetadata): Promise<boolean>;
   /** Returns false if `id` does not exist. */
   remove(id: MemoryId): Promise<boolean>;
-  /** Returns the number of rows re-embedded. */
-  rebuildIndex(): Promise<number>;
-  count(): number;
   close(): void;
 }
 
 /** Window multiplier when a metadata filter can't be pushed into the KNN. */
 const OVERFETCH = 5;
 
+/** Candidates fetched per retriever, as a multiple of topK. The floor is CANDIDATE_POOL. */
+const CANDIDATE_MULTIPLIER = 5;
+
 const REBUILD_BATCH = 64;
 
 /** stdout is the JSON-RPC channel — writing there corrupts the protocol. */
 const warn = (msg: string) => console.error(`[cattiva:memory] ${msg}`);
 
-const newId = (): MemoryId => `mem_${Date.now().toString(36)}${crypto.randomUUID().slice(0, 4)}`;
+/**
+ * Time prefix keeps ids roughly sortable; the suffix is 48 bits of randomness because
+ * the timestamp only has millisecond resolution. It used to take 4 hex chars — 16 bits
+ * — which collides at ~256 inserts inside one millisecond. Interactive `add_memory`
+ * calls are seconds apart so it never showed, but a bulk import trips it immediately.
+ */
+const newId = (): MemoryId =>
+  `mem_${Date.now().toString(36)}${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
 
 /**
  * The paper is ambiguous: `Add_memory` takes a top-level `memory_type`, but its
@@ -67,7 +102,22 @@ function splitFilter(filter?: MemoryMetadata) {
 const matchesMetadata = (actual: MemoryMetadata, wanted: MemoryMetadata) =>
   Object.entries(wanted).every(([k, v]) => actual[k] === v);
 
-export function openStore(path: string = defaultDbPath()): MemoryStore {
+const candidateCount = (topK: number) => Math.max(CANDIDATE_POOL, topK * CANDIDATE_MULTIPLIER);
+
+/**
+ * `embedder` and `scorer` are injectable so a harness can wrap them — the eval swaps in
+ * caching decorators, which is the only reason it can re-measure a ranking change in
+ * seconds instead of minutes. Injecting them here rather than reimplementing the search
+ * pipeline is what keeps the eval measuring *this* code and not a copy of it.
+ *
+ * The embedder must report the same `id` and `dimensions` as the default, or the
+ * index-rebuild bookkeeping below is comparing across embedding spaces.
+ */
+export function openStore(
+  path: string = defaultDbPath(),
+  embedder: Embedder = defaultEmbedder,
+  scorer: Reranker = defaultReranker,
+): MemoryStore {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
 
   const db = new Database(path, { create: true });
@@ -82,6 +132,18 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
   db.run(CREATE_MEMORIES);
   db.run(CREATE_STORE_META);
   db.run(CREATE_VEC_MEMORIES);
+  db.run(CREATE_MEMORIES_FTS);
+
+  // Derived data, so it can be rebuilt rather than migrated. This upgrades stores
+  // created before lexical retrieval existed without a migration step.
+  const memoryTotal = db.prepare<{ c: number }, []>("SELECT count(*) c FROM memories");
+  const ftsTotal = db.prepare<{ c: number }, []>("SELECT count(*) c FROM memories_fts");
+  if (memoryTotal.get()!.c !== ftsTotal.get()!.c) {
+    db.transaction(() => {
+      db.run("DELETE FROM memories_fts");
+      db.run("INSERT INTO memories_fts(memory_id, content) SELECT id, content FROM memories");
+    })();
+  }
 
   const readMeta = db.prepare<{ value: string }, [string]>(
     "SELECT value FROM store_meta WHERE key = ?",
@@ -95,6 +157,8 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   const selectMemory = db.prepare<MemoryRow, [string]>("SELECT * FROM memories WHERE id = ?");
+  const insertFts = db.prepare("INSERT INTO memories_fts(memory_id, content) VALUES (?, ?)");
+  const deleteFts = db.prepare("DELETE FROM memories_fts WHERE memory_id = ?");
 
   const insertVec = (id: string, vector: number[], memoryType: string | null) =>
     db.run("INSERT INTO vec_memories (memory_id, embedding, memory_type) VALUES (?, ?, ?)", [
@@ -155,7 +219,80 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
     }
   }
 
-  return {
+  /**
+   * Candidate ranks from each retriever, before fusion or reranking. Split out from
+   * `search` because the two answer different questions: this one is "what could
+   * plausibly match", `search` is "what is the best order". Fusion cannot promote what
+   * this never returned, so `limit` is the hard ceiling on recall.
+   */
+  async function candidates(
+    query: string,
+    limit: number,
+    filter?: MemoryMetadata,
+  ): Promise<RetrievalCandidates> {
+    await ensureIndex();
+    const [queryVector] = await embedder.embedQuery([query]);
+    if (!queryVector) return { dense: [], lexical: [] };
+
+    const { typeFilter, rest, hasRest } = splitFilter(filter);
+    const window = hasRest ? limit * OVERFETCH : limit;
+
+    const denseRows = db
+      .prepare<MemoryRow & { distance: number }, never[]>(
+        `SELECT m.*, v.distance
+           FROM vec_memories v
+           JOIN memories m ON m.id = v.memory_id
+          WHERE v.embedding MATCH ? AND v.k = ?
+            ${typeFilter === undefined ? "" : "AND v.memory_type = ?"}
+          ORDER BY v.distance`,
+      )
+      .all(
+        ...([
+          new Float32Array(queryVector),
+          window,
+          ...(typeFilter === undefined ? [] : [typeFilter]),
+        ] as never[]),
+      );
+
+    const fts = lexicalQuery(query);
+    const lexicalRows =
+      fts === undefined
+        ? []
+        : db
+            .prepare<MemoryRow & { lexical_rank: number }, never[]>(
+              `SELECT m.*, f.rank AS lexical_rank
+                 FROM memories_fts f
+                 JOIN memories m ON m.id = f.memory_id
+                WHERE memories_fts MATCH ?
+                  ${typeFilter === undefined ? "" : "AND m.memory_type = ?"}
+                ORDER BY f.rank
+                LIMIT ?`,
+            )
+            .all(...([fts, ...(typeFilter === undefined ? [] : [typeFilter]), window] as never[]));
+
+    const keep = (rows: MemoryRow[]) => {
+      const memories = rows.map(rowToMemory);
+      const filtered = hasRest
+        ? memories.filter((memory) => matchesMetadata(memory.metadata, rest))
+        : memories;
+      return filtered.slice(0, limit).map((item, index) => ({ item, rank: index + 1 }));
+    };
+
+    const dense = keep(denseRows);
+    const lexical = keep(lexicalRows);
+
+    if (hasRest && (dense.length < limit || lexical.length < limit)) {
+      if (denseRows.length === window || lexicalRows.length === window) {
+        warn(
+          `metadata filter exhausted a candidate window; dense=${dense.length}/${limit}, lexical=${lexical.length}/${limit}. Raise OVERFETCH if this recurs.`,
+        );
+      }
+    }
+
+    return { dense, lexical };
+  }
+
+  const store: MemoryStore = {
     async add(content, opts) {
       await ensureIndex();
       // Outside the transaction: embedding is slow and would hold the write lock.
@@ -176,6 +313,7 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
           now,
           now,
         );
+        insertFts.run(id, content);
         insertVec(id, vector, memoryType);
       })();
 
@@ -183,45 +321,29 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
     },
 
     async search(query, topK, filter) {
-      await ensureIndex();
-      const [queryVector] = await embedder.embedQuery([query]);
-      if (!queryVector) return [];
+      const pool = await candidates(query, candidateCount(topK), filter);
 
-      const { typeFilter, rest, hasRest } = splitFilter(filter);
-      const k = hasRest ? topK * OVERFETCH : topK;
+      // Fuse deeper than topK when reranking, so the cross-encoder can promote a
+      // memory fusion buried. Reranking only the final ten could reorder them but
+      // never rescue an eleventh.
+      const depth = RERANK_ENABLED ? Math.max(topK, RERANK_DEPTH) : topK;
+      const fused = reciprocalRankFuse(pool, depth);
 
-      const rows = db
-        .prepare<MemoryRow & { distance: number }, never[]>(
-          `SELECT m.*, v.distance
-             FROM vec_memories v
-             JOIN memories m ON m.id = v.memory_id
-            WHERE v.embedding MATCH ? AND v.k = ?
-              ${typeFilter === undefined ? "" : "AND v.memory_type = ?"}
-            ORDER BY v.distance`,
-        )
-        .all(
-          ...([
-            new Float32Array(queryVector),
-            k,
-            ...(typeFilter === undefined ? [] : [typeFilter]),
-          ] as never[]),
-        );
-
-      let hits: SearchHit[] = rows.map((row) => ({
-        memory: rowToMemory(row),
-        similarity: 1 - row.distance,
+      const hits: SearchHit[] = fused.map(({ item, score, sources }) => ({
+        memory: item,
+        similarity: normaliseRrfScore(score),
+        sources: [...new Set(sources)],
       }));
 
-      if (hasRest) {
-        hits = hits.filter((h) => matchesMetadata(h.memory.metadata, rest));
-        if (hits.length < topK && rows.length === k) {
-          warn(
-            `metadata filter exhausted the ${k}-row window; returning ${hits.length}/${topK}. Raise OVERFETCH if this recurs.`,
-          );
-        }
-      }
+      if (!RERANK_ENABLED) return hits.slice(0, topK);
 
-      return hits.slice(0, topK);
+      // Re-label with the cross-encoder's own score. Keeping the fusion score here
+      // would print numbers that contradict the order they are printed in, and the
+      // MCP response shows that number to the model.
+      const reordered = await rerank(query, hits, (hit) => hit.memory.content, scorer);
+      return reordered
+        .slice(0, topK)
+        .map(({ item, score }) => ({ ...item, similarity: relevanceProbability(score) }));
     },
 
     get(id) {
@@ -250,6 +372,8 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
             id,
           ],
         );
+        deleteFts.run(id);
+        insertFts.run(id, content);
         deleteVec(id);
         insertVec(id, vector, existing.memory_type);
       })();
@@ -260,19 +384,16 @@ export function openStore(path: string = defaultDbPath()): MemoryStore {
     async remove(id) {
       return db.transaction(() => {
         const result = db.run("DELETE FROM memories WHERE id = ?", [id]);
+        deleteFts.run(id);
         deleteVec(id);
         return result.changes > 0;
       })();
-    },
-
-    rebuildIndex,
-
-    count() {
-      return db.prepare<{ c: number }, []>("SELECT count(*) c FROM memories").get()!.c;
     },
 
     close() {
       db.close();
     },
   };
+
+  return store;
 }
