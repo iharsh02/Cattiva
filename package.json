@@ -8,6 +8,7 @@
     "url": "git+https://github.com/iharsh02/cattiva.git"
   },
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "type": "module",
@@ -23,7 +24,9 @@
     "eval:memory-engine": "bun run --filter @cattiva/memory-engine eval",
     "eval:memory-engine:save": "bun run --filter @cattiva/memory-engine eval:save",
     "release:memory-engine": "bun run --filter @cattiva/memory-engine pack:dry",
-    "eval:memory-engine:compare": "bun run --filter @cattiva/memory-engine eval:compare"
+    "eval:memory-engine:compare": "bun run --filter @cattiva/memory-engine eval:compare",
+    "cli:start": "bun run apps/cli/src/index.tsx",
+    "cli:dev": "bun run --watch apps/cli/src/index.tsx"
   },
   "devDependencies": {
     "@types/bun": "latest",
