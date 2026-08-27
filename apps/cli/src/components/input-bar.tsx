@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyBinding, TextareaRenderable } from "@opentui/core";
 import { useRenderer } from "@opentui/react";
-import { DIM } from "../theme";
-import { useCommandMenu } from "../hooks/useCommandMenu";
+import { DIM } from "@/theme";
+import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
-import type { Command } from "../types/commandMenu";
+import type { Command } from "@/types/commandMenu";
+import { useToast } from "@/providers/toast";
 
 export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "return", action: "submit" },
@@ -33,6 +34,8 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
     setSelectedIndex,
   } = useCommandMenu();
 
+  const toast = useToast();
+
   /**
    * destroy() restores the terminal but only emits DESTROY when it is called outside a
    * render pass; from a React commit it takes opentui's deferred branch, which suspends
@@ -51,12 +54,12 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
       textarea.setText("");
 
       if (command.action) {
-        command.action({ exit: exitApp });
+        command.action({ exit: exitApp, toast });
       } else {
         textarea.insertText(`${command.value} `);
       }
     },
-    [exitApp],
+    [exitApp, toast],
   );
 
   const handleCommandExecute = useCallback(

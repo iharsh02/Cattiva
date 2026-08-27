@@ -9,6 +9,9 @@
     "jsxImportSource": "@opentui/react",
     "strict": true,
     "skipLibCheck": true,
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }

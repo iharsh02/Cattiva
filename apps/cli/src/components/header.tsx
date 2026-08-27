@@ -1,5 +1,5 @@
 import { version } from "../../package.json";
-import { DIM } from "../theme";
+import { DIM } from "@/theme";
 
 export function Header() {
   return (

@@ -2,10 +2,10 @@ import "@opentui/react/runtime-plugin-support";
 import { CliRenderEvents, createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { version } from "../package.json";
-import { Header } from "./components/header";
-import { InputBar } from "./components/input-bar";
-import { StatusBar } from "./components/status-bar";
-import { ToastProvider } from "./providers/toast";
+import { Header } from "@/components/header";
+import { InputBar } from "@/components/input-bar";
+import { StatusBar } from "@/components/status-bar";
+import { ToastProvider } from "@/providers/toast";
 
 function App() {
   return (

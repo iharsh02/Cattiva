@@ -2,9 +2,9 @@ import type { RefObject } from "react";
 import { useEffect } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { TextAttributes } from "@opentui/core";
-import { filterCommands } from "../utils/filter-commands";
+import { filterCommands } from "@/utils/filter-commands";
 import { COMMANDS } from "./commands";
-import { DIM, FG, SELECTED_BG } from "../theme";
+import { DIM, FG, SELECTED_BG } from "@/theme";
 
 const MAX_COMMANDS_DISPLAYED = 8;
 

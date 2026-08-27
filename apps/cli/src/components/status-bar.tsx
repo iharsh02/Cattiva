@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { sep } from "node:path";
-import { DIM } from "../theme";
+import { DIM } from "@/theme";
 
 const MODEL = "claude-opus-5";
 
