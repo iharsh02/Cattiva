@@ -1,46 +1,21 @@
 import "@opentui/react/runtime-plugin-support";
-import { homedir } from "node:os";
-import { sep } from "node:path";
 import { CliRenderEvents, createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { version } from "../package.json";
-
-const DIM = "#808080";
-
-const MODEL = "claude-opus-5";
-
-const home = homedir();
-const cwd = process.cwd();
-const DIR = cwd === home ? "~" : cwd.startsWith(home + sep) ? `~${cwd.slice(home.length)}` : cwd;
-
-const lines = [MODEL, DIR];
+import { Header } from "./components/header";
+import { InputBar } from "./components/input-bar";
+import { StatusBar } from "./components/status-bar";
+import { ToastProvider } from "./providers/toast";
 
 function App() {
   return (
-    <>
+    <ToastProvider>
       <box flexDirection="column" padding={1} gap={1}>
-        <box flexDirection="row" gap={1}>
-          <ascii-font text="Cattiva" font="tiny" />
-          <text fg={DIM}>v{version}</text>
-        </box>
-        <box flexDirection="column">
-          {lines.map((line) => (
-            <text key={line} fg={DIM}>
-              {line}
-            </text>
-          ))}
-        </box>
+        <Header />
+        <StatusBar />
       </box>
-      <box flexDirection="column">
-        <box flexDirection="row" gap={1} border borderStyle="rounded" borderColor={DIM}>
-          <text fg={DIM}>{">"}</text>
-          <input focused placeholder="Ask anything" flexGrow={1} />
-        </box>
-        <box paddingLeft={2}>
-          <text fg={DIM}>ctrl+c to quit</text>
-        </box>
-      </box>
-    </>
+      <InputBar />
+    </ToastProvider>
   );
 }
 
