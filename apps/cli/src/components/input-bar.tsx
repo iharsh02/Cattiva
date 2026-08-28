@@ -6,6 +6,7 @@ import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
 import type { Command } from "@/types/commandMenu";
 import { useToast } from "@/providers/toast";
+import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 
 export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "return", action: "submit" },
@@ -35,16 +36,10 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   } = useCommandMenu();
 
   const toast = useToast();
+  const { setResponder, isTopLayer } = useKeyboardLayer();
 
-  /**
-   * destroy() restores the terminal but only emits DESTROY when it is called outside a
-   * render pass; from a React commit it takes opentui's deferred branch, which suspends
-   * the renderer and never finalises. So the exit cannot be left to that event here.
-   */
-  const exitApp = useCallback(() => {
-    renderer.destroy();
-    setImmediate(() => process.exit(0));
-  }, [renderer]);
+  /** Tearing down the renderer is the whole quit: index.tsx exits on its DESTROY. */
+  const exitApp = useCallback(() => renderer.destroy(), [renderer]);
 
   const handleCommand = useCallback(
     (command: Command | undefined) => {
@@ -105,6 +100,26 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
     handleSubmit();
   };
 
+  /**
+   * ctrl+c clears a half-typed prompt before it quits the app. Returning true consumes
+   * the key so the layer stops searching; returning false lets it fall through to the
+   * provider, which destroys the renderer.
+   */
+  useEffect(() => {
+    setResponder(LAYER.base, () => {
+      if (disabled) return false;
+
+      const textarea = textareaRef.current;
+      if (textarea && textarea.plainText.length > 0) {
+        textarea.setText("");
+        return true;
+      }
+      return false;
+    });
+
+    return () => setResponder(LAYER.base, null);
+  }, [disabled, setResponder]);
+
   return (
     <box flexDirection="column">
       {showCommandMenu && (
@@ -121,7 +136,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
         <text fg={DIM}>{">"}</text>
         <textarea
           ref={textareaRef}
-          focused={!disabled}
+          focused={!disabled && (isTopLayer(LAYER.base) || isTopLayer(LAYER.command))}
           keyBindings={TEXTAREA_KEY_BINDINGS}
           placeholder="Ask anything"
           flexGrow={1}

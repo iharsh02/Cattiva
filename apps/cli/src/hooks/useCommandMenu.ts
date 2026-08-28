@@ -3,6 +3,7 @@ import type { ScrollBoxRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { Command } from "@/types/commandMenu";
 import { filterCommands } from "@/utils/filter-commands";
+import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 
 type UseCommandMenuReturn = {
   showCommandMenu: boolean;
@@ -19,28 +20,48 @@ export function useCommandMenu(): UseCommandMenuReturn {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
-
+  const { push, pop, isTopLayer } = useKeyboardLayer();
   const commandQuery = showCommandMenu && textValue.startsWith("/") ? textValue.slice(1) : "";
 
   const filteredCommands = useMemo(() => filterCommands(commandQuery), [commandQuery]);
 
-  const handleContentChange = useCallback((text: string) => {
-    setTextValue(text);
-    setSelectedIndex(0);
-    scrollRef.current?.scrollTo(0);
+  const closeCommandMenu = useCallback(() => {
+    setShowCommandMenu(false);
+    pop(LAYER.command);
+  }, [pop]);
 
-    // A command is only being typed while the text is one unbroken "/word".
-    const prefix = text.startsWith("/") ? text.slice(1) : null;
-    setShowCommandMenu(prefix !== null && !prefix.includes(" "));
-  }, []);
+  const openCommandMenu = useCallback(() => {
+    setShowCommandMenu(true);
+    push(LAYER.command, () => {
+      closeCommandMenu();
+      return true;
+    });
+  }, [push, closeCommandMenu]);
+
+  const handleContentChange = useCallback(
+    (text: string) => {
+      setTextValue(text);
+      setSelectedIndex(0);
+      scrollRef.current?.scrollTo(0);
+
+      // A command is only being typed while the text is one unbroken "/word".
+      const prefix = text.startsWith("/") ? text.slice(1) : null;
+      if (prefix !== null && !prefix.includes(" ")) {
+        openCommandMenu();
+      } else {
+        closeCommandMenu();
+      }
+    },
+    [openCommandMenu, closeCommandMenu],
+  );
 
   const resolveCommand = useCallback(
     (index: number): Command | undefined => {
       const command = filteredCommands[index];
-      if (command) setShowCommandMenu(false);
+      if (command) closeCommandMenu();
       return command;
     },
-    [filteredCommands],
+    [filteredCommands, closeCommandMenu],
   );
 
   /** Rows are one line tall, so scrollTop counts rows. */
@@ -56,10 +77,11 @@ export function useCommandMenu(): UseCommandMenuReturn {
   }, []);
 
   useKeyboard((key) => {
-    if (!showCommandMenu) return;
+    if (!showCommandMenu || !isTopLayer(LAYER.command)) return;
+
     if (key.name === "escape") {
       key.preventDefault();
-      setShowCommandMenu(false);
+      closeCommandMenu();
     } else if (key.name === "up") {
       key.preventDefault();
       const next = Math.max(0, selectedIndex - 1);

@@ -6,16 +6,19 @@ import { Header } from "@/components/header";
 import { InputBar } from "@/components/input-bar";
 import { StatusBar } from "@/components/status-bar";
 import { ToastProvider } from "@/providers/toast";
+import { KeyboardLayerProvider } from "@/providers/keyboard-layer";
 
 function App() {
   return (
-    <ToastProvider>
-      <box flexDirection="column" padding={1} gap={1}>
-        <Header />
-        <StatusBar />
-      </box>
-      <InputBar />
-    </ToastProvider>
+    <KeyboardLayerProvider>
+      <ToastProvider>
+        <box flexDirection="column" padding={1} gap={1}>
+          <Header />
+          <StatusBar />
+        </box>
+        <InputBar />
+      </ToastProvider>
+    </KeyboardLayerProvider>
   );
 }
 
@@ -34,7 +37,9 @@ if (!process.stdout.isTTY) {
   process.exit(1);
 }
 
-const renderer = await createCliRenderer();
+// ctrl+c belongs to KeyboardLayerProvider: opentui's own handler fires without checking
+// defaultPrevented, so no layer could decline the quit while this was on.
+const renderer = await createCliRenderer({ exitOnCtrlC: false });
 renderer.on(CliRenderEvents.DESTROY, () => setImmediate(() => process.exit(0)));
 
 createRoot(renderer).render(<App />);
