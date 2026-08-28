@@ -4,6 +4,7 @@ import { useKeyboard, useRenderer } from "@opentui/react";
 export const LAYER = {
   base: "base",
   command: "command",
+  dialog: "dialog",
 } as const;
 
 export type LayerId = (typeof LAYER)[keyof typeof LAYER];

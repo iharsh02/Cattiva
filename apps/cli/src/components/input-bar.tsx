@@ -7,6 +7,7 @@ import { CommandMenu } from "./command-menu";
 import type { Command } from "@/types/commandMenu";
 import { useToast } from "@/providers/toast";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
+import { useDialog } from "@/providers/dialog";
 
 export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "return", action: "submit" },
@@ -36,6 +37,8 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   } = useCommandMenu();
 
   const toast = useToast();
+  const dialog = useDialog();
+
   const { setResponder, isTopLayer } = useKeyboardLayer();
 
   /** Tearing down the renderer is the whole quit: index.tsx exits on its DESTROY. */
@@ -49,7 +52,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
       textarea.setText("");
 
       if (command.action) {
-        command.action({ exit: exitApp, toast });
+        command.action({ exit: exitApp, toast, dialog });
       } else {
         textarea.insertText(`${command.value} `);
       }

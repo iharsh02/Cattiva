@@ -38,6 +38,12 @@ export const COMMANDS: Command[] = [
     name: "agents",
     description: "List and configure the available agents",
     value: "/agents",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Select Mode",
+        children: <text>Agent Selection window</text>,
+      });
+    },
   },
   {
     name: "exit",

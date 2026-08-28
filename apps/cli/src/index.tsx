@@ -7,16 +7,19 @@ import { InputBar } from "@/components/input-bar";
 import { StatusBar } from "@/components/status-bar";
 import { ToastProvider } from "@/providers/toast";
 import { KeyboardLayerProvider } from "@/providers/keyboard-layer";
+import { DialogProvider } from "@/providers/dialog";
 
 function App() {
   return (
     <KeyboardLayerProvider>
       <ToastProvider>
-        <box flexDirection="column" padding={1} gap={1}>
-          <Header />
-          <StatusBar />
-        </box>
-        <InputBar />
+        <DialogProvider>
+          <box flexDirection="column" padding={1} gap={1}>
+            <Header />
+            <StatusBar />
+          </box>
+          <InputBar />
+        </DialogProvider>
       </ToastProvider>
     </KeyboardLayerProvider>
   );
