@@ -1,3 +1,4 @@
+import { ThemePicker } from "./theme-picker";
 import type { Command } from "@/types/commandMenu";
 
 export const COMMANDS: Command[] = [
@@ -42,6 +43,17 @@ export const COMMANDS: Command[] = [
       ctx.dialog.open({
         title: "Select Mode",
         children: <text>Agent Selection window</text>,
+      });
+    },
+  },
+  {
+    name: "theme",
+    description: "Switch the colour theme",
+    value: "/theme",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Select Theme",
+        children: <ThemePicker />,
       });
     },
   },

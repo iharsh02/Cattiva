@@ -8,20 +8,33 @@ import { StatusBar } from "@/components/status-bar";
 import { ToastProvider } from "@/providers/toast";
 import { KeyboardLayerProvider } from "@/providers/keyboard-layer";
 import { DialogProvider } from "@/providers/dialog";
+import { ThemeProvider, useTheme } from "@/providers/theme";
+
+function AppShell() {
+  const { colors } = useTheme();
+
+  return (
+    <box flexDirection="column" width="100%" height="100%" backgroundColor={colors.background}>
+      <box flexDirection="column" padding={1} gap={1}>
+        <Header />
+        <StatusBar />
+      </box>
+      <InputBar />
+    </box>
+  );
+}
 
 function App() {
   return (
-    <KeyboardLayerProvider>
-      <ToastProvider>
-        <DialogProvider>
-          <box flexDirection="column" padding={1} gap={1}>
-            <Header />
-            <StatusBar />
-          </box>
-          <InputBar />
-        </DialogProvider>
-      </ToastProvider>
-    </KeyboardLayerProvider>
+    <ThemeProvider>
+      <KeyboardLayerProvider>
+        <ToastProvider>
+          <DialogProvider>
+            <AppShell />
+          </DialogProvider>
+        </ToastProvider>
+      </KeyboardLayerProvider>
+    </ThemeProvider>
   );
 }
 

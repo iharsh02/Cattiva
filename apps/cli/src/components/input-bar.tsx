@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyBinding, TextareaRenderable } from "@opentui/core";
 import { useRenderer } from "@opentui/react";
-import { DIM } from "@/theme";
+import { useTheme } from "@/providers/theme";
 import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
 import type { Command } from "@/types/commandMenu";
@@ -37,6 +37,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   } = useCommandMenu();
 
   const toast = useToast();
+  const { colors } = useTheme();
   const dialog = useDialog();
 
   const { setResponder, isTopLayer } = useKeyboardLayer();
@@ -135,19 +136,26 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
         />
       )}
 
-      <box flexDirection="row" gap={1} border borderStyle="rounded" borderColor={DIM}>
-        <text fg={DIM}>{">"}</text>
+      <box
+        flexDirection="row"
+        gap={1}
+        border
+        borderStyle="rounded"
+        borderColor={colors.dimSeparator}
+      >
+        <text fg={colors.dimSeparator}>{">"}</text>
         <textarea
           ref={textareaRef}
           focused={!disabled && (isTopLayer(LAYER.base) || isTopLayer(LAYER.command))}
           keyBindings={TEXTAREA_KEY_BINDINGS}
           placeholder="Ask anything"
+          placeholderColor={colors.dimSeparator}
           flexGrow={1}
           onContentChange={handleTextareaContentChange}
         />
       </box>
       <box paddingLeft={2}>
-        <text fg={DIM}>ctrl+c to quit</text>
+        <text fg={colors.dimSeparator}>ctrl+c to quit</text>
       </box>
     </box>
   );

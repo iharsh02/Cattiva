@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTerminalDimensions } from "@opentui/react";
 import type { ToastOptions, ToastVariant } from "./types";
 import { DEFAULT_DURATION } from "./types";
-import { useTheme } from "@/theme";
+import { useTheme } from "@/providers/theme";
 
 export type ToastContextValue = {
   show: (options: ToastOptions) => void;
@@ -79,9 +79,7 @@ function Toast({ currentToast }: ToastProps) {
   const variantColors: Record<ToastVariant, string> = {
     success: colors.success,
     error: colors.error,
-    warning: colors.warning,
-    // A neutral notice is just text: no accent to set it apart from ordinary output.
-    info: colors.fg,
+    info: colors.info,
   };
 
   const accent = variantColors[currentToast.variant ?? "info"];

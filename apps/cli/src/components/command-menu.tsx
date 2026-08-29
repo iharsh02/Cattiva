@@ -1,10 +1,9 @@
 import type { RefObject } from "react";
 import { useEffect } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
-import { TextAttributes } from "@opentui/core";
 import { filterCommands } from "@/utils/filter-commands";
 import { COMMANDS } from "./commands";
-import { DIM, FG, SELECTED_BG } from "@/theme";
+import { useTheme } from "@/providers/theme";
 
 const MAX_COMMANDS_DISPLAYED = 8;
 
@@ -25,6 +24,8 @@ export function CommandMenu({
   onSelect,
   onExecute,
 }: CommandMenuProps) {
+  const { colors } = useTheme();
+
   const filtered = filterCommands(query);
   const visibleHeight = Math.min(filtered.length, MAX_COMMANDS_DISPLAYED);
 
@@ -42,7 +43,7 @@ export function CommandMenu({
   if (filtered.length === 0) {
     return (
       <box paddingX={2} paddingY={1}>
-        <text attributes={TextAttributes.DIM}>No matching command found</text>
+        <text fg={colors.dimSeparator}>No matching command found</text>
       </box>
     );
   }
@@ -59,17 +60,17 @@ export function CommandMenu({
             paddingX={1}
             height={1}
             overflow="hidden"
-            backgroundColor={isSelected ? SELECTED_BG : undefined}
+            backgroundColor={isSelected ? colors.surface : undefined}
             onMouseMove={() => onSelect(index)}
             onMouseDown={() => onExecute(index)}
           >
             <box width={COMMAND_COL_WIDTH} flexShrink={0}>
-              <text selectable={false} fg={isSelected ? FG : DIM}>
+              <text selectable={false} fg={isSelected ? colors.selection : colors.dimSeparator}>
                 /{cmd.name}
               </text>
             </box>
             <box flexGrow={1} overflow="hidden">
-              <text selectable={false} fg={DIM}>
+              <text selectable={false} fg={colors.dimSeparator}>
                 {cmd.description}
               </text>
             </box>

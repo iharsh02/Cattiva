@@ -4,7 +4,7 @@ import { RGBA, TextAttributes } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import type { DialogConfig } from "./types";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
-import { useTheme } from "@/theme";
+import { useTheme } from "@/providers/theme";
 
 /** Dims whatever is behind the panel, so the dialog reads as modal rather than floating. */
 const SCRIM = RGBA.fromInts(0, 0, 0, 150);
@@ -108,14 +108,14 @@ function Dialog({ currentDialog, close }: DialogProps) {
         width={Math.max(1, Math.min(MAX_WIDTH, width - 4))}
         paddingX={4}
         paddingY={1}
-        backgroundColor={colors.surface}
+        backgroundColor={colors.dialogSurface}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <box flexDirection="row" justifyContent="space-between">
-          <text fg={colors.fg} attributes={TextAttributes.BOLD}>
+          <text fg={colors.primary} attributes={TextAttributes.BOLD}>
             {title}
           </text>
-          <text fg={colors.dim} onMouseDown={close}>
+          <text fg={colors.dimSeparator} onMouseDown={close}>
             esc
           </text>
         </box>
