@@ -4,9 +4,9 @@ import { createRoot } from "@opentui/react";
 import { version } from "../package.json";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { RootLayout } from "./layout/root-layout";
-import { Home } from "@/screens/home";
-import { NewSession } from "@/screens/new-session";
-import { Session } from "./screens/session";
+import { Home } from "@/components/screens/home";
+import { NewSession } from "@/components/screens/new-session";
+import { Session } from "./components/screens/session";
 
 const router = createMemoryRouter([
   {
