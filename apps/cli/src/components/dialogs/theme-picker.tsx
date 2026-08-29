@@ -3,7 +3,7 @@ import type { Theme } from "@/theme";
 import { THEMES } from "@/theme";
 import { useTheme } from "@/providers/theme";
 import { useDialog } from "@/providers/dialog";
-import { DialogSearchList } from "./dialog-search-list";
+import { SearchList } from "./search-list";
 
 export function ThemePicker() {
   const { colors, currentTheme, setTheme, previewTheme } = useTheme();
@@ -33,7 +33,7 @@ export function ThemePicker() {
   );
 
   return (
-    <DialogSearchList
+    <SearchList
       items={THEMES}
       getKey={(theme) => theme.name}
       initialIndex={initialIndex}

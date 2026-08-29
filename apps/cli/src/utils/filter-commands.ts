@@ -1,5 +1,5 @@
 import type { Command } from "@/types/commandMenu";
-import { COMMANDS } from "@/components/commands";
+import { COMMANDS } from "@/components/prompt/command-registry";
 
 export function filterCommands(input: string): Command[] {
   const query = input.trim().replace(/^\//, "").toLowerCase();

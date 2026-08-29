@@ -6,7 +6,7 @@ import { useTheme } from "@/providers/theme";
 
 const MAX_VISIBLE_ITEMS = 6;
 
-type DialogSearchListProps<T> = {
+type SearchListProps<T> = {
   items: T[];
   onSelect: (item: T) => void;
   onHighlight?: (item: T) => void;
@@ -19,7 +19,7 @@ type DialogSearchListProps<T> = {
   emptyText?: string;
 };
 
-export function DialogSearchList<T>({
+export function SearchList<T>({
   items,
   onSelect,
   onHighlight,
@@ -29,7 +29,7 @@ export function DialogSearchList<T>({
   initialIndex = 0,
   placeholder = "Search",
   emptyText = "No matches",
-}: DialogSearchListProps<T>) {
+}: SearchListProps<T>) {
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
   const [query, setQuery] = useState("");
 

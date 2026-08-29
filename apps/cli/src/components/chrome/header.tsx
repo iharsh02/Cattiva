@@ -1,4 +1,4 @@
-import { version } from "../../package.json";
+import { version } from "../../../package.json";
 import { useTheme } from "@/providers/theme";
 
 export function Header() {

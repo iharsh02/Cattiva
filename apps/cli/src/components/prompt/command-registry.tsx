@@ -1,4 +1,4 @@
-import { ThemePicker } from "./theme-picker";
+import { ThemePicker } from "@/components/dialogs/theme-picker";
 import type { Command } from "@/types/commandMenu";
 
 export const COMMANDS: Command[] = [

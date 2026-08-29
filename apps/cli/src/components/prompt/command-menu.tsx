@@ -2,7 +2,7 @@ import type { RefObject } from "react";
 import { useEffect } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { filterCommands } from "@/utils/filter-commands";
-import { COMMANDS } from "./commands";
+import { COMMANDS } from "./command-registry";
 import { useTheme } from "@/providers/theme";
 
 const MAX_COMMANDS_DISPLAYED = 8;
