@@ -3,12 +3,12 @@
  * The same harness against LoCoMo — 10 long multi-session conversations,
  * 5,882 turns, 1,986 questions with human-labelled evidence turns.
  *
- *   curl -sSLo packages/memory-engine/eval/data/locomo10.json \
+ *   curl -sSLo mcp/memory/eval/data/locomo10.json \
  *     https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json
  *
- *   bun run packages/memory-engine/eval/locomo.ts
- *   bun run packages/memory-engine/eval/locomo.ts --limit 2   first 2 conversations
- *   bun run packages/memory-engine/eval/locomo.ts --save
+ *   bun run mcp/memory/eval/locomo.ts
+ *   bun run mcp/memory/eval/locomo.ts --limit 2   first 2 conversations
+ *   bun run mcp/memory/eval/locomo.ts --save
  *
  * It measures the shipping pipeline, not a copy of it: every question goes through
  * `store.search()` exactly as the MCP tool does, with caching embedder and reranker

@@ -43,7 +43,7 @@ dist/
 .claude/
 
 # eval datasets (downloaded, not committed)
-packages/*/eval/data/
+mcp/*/eval/data/
 
 # paper PDFs and other local reference material
 docs/

@@ -14,15 +14,15 @@ never touched.
 
 ```bash
 # one-time: fetch the dataset (2.8MB, gitignored)
-mkdir -p packages/memory-engine/eval/data
-curl -sSLo packages/memory-engine/eval/data/locomo10.json \
+mkdir -p mcp/memory/eval/data
+curl -sSLo mcp/memory/eval/data/locomo10.json \
   https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json
 
-bun run eval:memory-engine          # ~10 sec warm, ~8 min cold
-bun run eval:memory-engine:save     # …and record it as this model's baseline
+bun run memory:eval          # ~10 sec warm, ~8 min cold
+bun run memory:eval:save     # …and record it as this model's baseline
 
-bun run packages/memory-engine/eval/locomo.ts --limit 2    # 2 conversations
-bun run packages/memory-engine/eval/locomo.ts --no-cache   # ignore both caches
+bun run mcp/memory/eval/locomo.ts --limit 2    # 2 conversations
+bun run mcp/memory/eval/locomo.ts --no-cache   # ignore both caches
 ```
 
 Every question goes through **`store.search()`** — the same call the MCP tool makes,
@@ -33,10 +33,10 @@ That is also why the ablations are the product's **own environment variables** r
 than eval-only flags: a setting that scores well here is one a user can actually turn on.
 
 ```bash
-env CATTIVA_EMBED_MODEL=Xenova/gte-base bun run eval:memory-engine     # swap embedder
-env CATTIVA_RERANK=0 bun run eval:memory-engine                        # no cross-encoder
+env CATTIVA_EMBED_MODEL=Xenova/gte-base bun run memory:eval     # swap embedder
+env CATTIVA_RERANK=0 bun run memory:eval                        # no cross-encoder
 env CATTIVA_CANDIDATE_POOL=200 CATTIVA_RERANK_DEPTH=100 \
-  bun run eval:memory-engine                                           # wider pool + shortlist
+  bun run memory:eval                                           # wider pool + shortlist
 ```
 
 ### The caches

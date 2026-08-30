@@ -2,14 +2,14 @@
 
 A suite of toolkits for AI agents, exposed over [MCP](https://modelcontextprotocol.io).
 
-Each toolkit is a package under `packages/`, usable from Claude Code, Codex, Cursor, or
-anything else that speaks MCP.
+Each server lives under `mcp/`, usable from Claude Code, Codex, Cursor, or anything else
+that speaks MCP.
 
-## Toolkits
+## Servers
 
-| Package                                            | What it does                                                                            |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [`@cattiva/memory-engine`](packages/memory-engine) | Long-term memory: store, retrieve, update and delete facts that survive across sessions |
+| Server                     | Package            | What it does                                                                            |
+| -------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| [`mcp/memory`](mcp/memory) | `@cattiva/ltm-mcp` | Long-term memory: store, retrieve, update and delete facts that survive across sessions |
 
 ## Install
 
@@ -21,14 +21,14 @@ Requires [Bun](https://bun.com). Add to your MCP config — `.mcp.json` for Clau
   "mcpServers": {
     "memory": {
       "command": "bunx",
-      "args": ["-y", "@cattiva/memory-engine"]
+      "args": ["-y", "@cattiva/ltm-mcp"]
     }
   }
 }
 ```
 
 Restart your agent. Nothing else to install — no database to run, no API key. The first
-memory downloads a ~25MB embedding model and the first search a ~23MB reranker, then it
+memory downloads a ~34MB embedding model and the first search a ~23MB reranker, then it
 works offline. Nothing you store leaves the machine.
 
 By default memories live in `~/.cattiva/memory.db`. Set `CATTIVA_MEMORY_DB` to keep them
@@ -36,7 +36,7 @@ per-project instead.
 
 ## Retrieval quality
 
-Retrieval is measured, not asserted. The [eval](packages/memory-engine/eval) runs against
+Retrieval is measured, not asserted. The [eval](mcp/memory/eval) runs against
 [LoCoMo](https://github.com/snap-research/locomo) — 10 multi-session conversations, 5,882
 turns, 1,977 questions with hand-labelled evidence:
 
@@ -61,8 +61,8 @@ Measured and _not_ taken: widening the candidate pool. Fetching 4x more candidat
 the top answer for one question in 1,977, which is how we know the cross-encoder's
 judgement — not the size of the search — is what limits this now.
 
-Run it yourself with `bun run eval:memory-engine`. See the
-[eval README](packages/memory-engine/eval/README.md) for the method, the per-category
+Run it yourself with `bun run memory:eval`. See the
+[eval README](mcp/memory/eval/README.md) for the method, the per-category
 breakdown, and what the numbers do not cover.
 
 ## Skills
@@ -98,11 +98,14 @@ bun install
 bun run typecheck
 bun run lint
 bun run format
-bun run dev:memory-engine   # run the memory engine directly on stdio
+bun run memory:dev   # run the memory server directly on stdio
 ```
 
 [`.mcp.json`](.mcp.json) is checked in and points at the **local source**, so opening this
-repo in Claude Code connects the toolkit you're editing rather than the published package.
+repo in Claude Code connects the server you're editing rather than the published package.
+
+Repository layout: `mcp/` holds the MCP servers, one publishable package each; `apps/` holds
+the CLI; `packages/` is for shared libraries the servers and apps draw on.
 
 ## License
 

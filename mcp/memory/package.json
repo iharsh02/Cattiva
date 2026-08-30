@@ -1,23 +1,26 @@
 {
-  "name": "@cattiva/memory-engine",
-  "version": "0.2.0",
+  "name": "@cattiva/ltm-mcp",
+  "version": "0.3.0",
   "description": "Long-term memory for AI agents, exposed over MCP.",
   "keywords": [
     "agent",
     "claude",
     "embeddings",
+    "ltm",
     "mcp",
     "memory",
+    "reranking",
     "sqlite-vec"
   ],
   "license": "GPL-3.0-or-later",
   "author": "iharsh02 <ht266005@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iharsh02/cattiva.git"
+    "url": "git+https://github.com/iharsh02/cattiva.git",
+    "directory": "mcp/memory"
   },
   "bin": {
-    "memory-engine": "dist/index.mjs"
+    "ltm-mcp": "dist/index.mjs"
   },
   "files": [
     "dist"
@@ -29,12 +32,9 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "eval": "bun run eval/locomo.ts",
-    "eval:save": "bun run eval/locomo.ts --save",
     "pack:dry": "bun run build && bun pm pack --dry-run",
     "prepack": "bun run build",
-    "prepublishOnly": "bun run typecheck && bun run build",
-    "eval:compare": "bun run eval/compare.ts"
+    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "dependencies": {
     "@browser-ai/transformers-js": "^3.0.0",

@@ -10,28 +10,16 @@ import {
 import type { Memory } from "./memory.ts";
 import { openStore, type MemoryStore, type SearchHit } from "./store.ts";
 
+import { version } from "../package.json" with { type: "json" };
+
 const text = (body: string) => ({ content: [{ type: "text" as const, text: body }] });
 const failure = (body: string) => ({ ...text(body), isError: true });
 
 let store: MemoryStore | undefined;
 const getStore = (): MemoryStore => (store ??= openStore());
 
-/**
- * Two significant figures, not two decimal places. Cross-encoder relevance spans
- * orders of magnitude and is small in absolute terms even for good matches, so
- * fixed decimals print `0.00` for every result and hide the ranking entirely.
- */
 const formatScore = (n: number): string => (n >= 0.01 ? n.toFixed(2) : n.toPrecision(2));
 
-/**
- * When the fact was last asserted, and when it was first stored if those differ.
- *
- * Memories contradict each other as things change — a database chosen in March and
- * replaced in June — and nothing in the content says which one is current. The dates
- * are stored either way; omitting them made the stale memory look exactly as current
- * as the true one. Ranking cannot settle this and should not try: the model reading
- * both is the thing that knows March precedes June.
- */
 const formatDate = (memory: Memory): string => {
   const created = memory.createdAt.slice(0, 10);
   const updated = memory.updatedAt.slice(0, 10);
@@ -49,10 +37,7 @@ const formatHits = (hits: SearchHit[]): string => {
 };
 
 function createServer(): McpServer {
-  const server = new McpServer(
-    { name: "memory-engine", version: "1.0.0" },
-    { capabilities: { tools: {} } },
-  );
+  const server = new McpServer({ name: "ltm-mcp", version }, { capabilities: { tools: {} } });
 
   server.registerTool(
     "add_memory",
