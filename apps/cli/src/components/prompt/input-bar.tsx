@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyBinding, TextareaRenderable } from "@opentui/core";
 import { useRenderer } from "@opentui/react";
+import { useNavigate } from "react-router";
 import { useTheme } from "@/providers/theme";
 import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
@@ -19,11 +20,14 @@ export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
 type InputBarProps = {
   disabled?: boolean;
   onSubmit?: (text: string) => void;
+  onCancel?: () => void;
 };
 
-export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
+export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps) {
   const textareaRef = useRef<TextareaRenderable>(null);
   const onSubmitRef = useRef<() => void>(() => {});
+  const onCancelRef = useRef<(() => void) | undefined>(undefined);
+  onCancelRef.current = onCancel;
   const renderer = useRenderer();
 
   const {
@@ -41,6 +45,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   const dialog = useDialog();
 
   const { setResponder, isTopLayer } = useKeyboardLayer();
+  const navigate = useNavigate();
 
   /** Tearing down the renderer is the whole quit: index.tsx exits on its DESTROY. */
   const exitApp = useCallback(() => renderer.destroy(), [renderer]);
@@ -53,12 +58,12 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
       textarea.setText("");
 
       if (command.action) {
-        command.action({ exit: exitApp, toast, dialog });
+        command.action({ exit: exitApp, toast, dialog, navigate });
       } else {
         textarea.insertText(`${command.value} `);
       }
     },
-    [exitApp, toast],
+    [exitApp, toast, dialog, navigate],
   );
 
   const handleCommandExecute = useCallback(
@@ -73,17 +78,20 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   }, [handleContentChange]);
 
   const handleSubmit = useCallback(() => {
-    if (disabled) return;
-
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     const text = textarea.plainText.trim();
     if (text.length === 0) return;
 
+    if (disabled) {
+      toast.show({ variant: "info", message: "Sending is not wired up yet" });
+      return;
+    }
+
     onSubmit?.(text);
     textarea.setText("");
-  }, [disabled, onSubmit]);
+  }, [disabled, onSubmit, toast]);
 
   // Bound once; the ref below keeps the body current without rebinding every render.
   useEffect(() => {
@@ -93,9 +101,6 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
   }, []);
 
   onSubmitRef.current = () => {
-    if (disabled) return;
-
-    // Enter belongs to the menu while it is open, and to the prompt otherwise.
     if (showCommandMenu) {
       handleCommand(resolveCommand(selectedIndex));
       return;
@@ -104,25 +109,24 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
     handleSubmit();
   };
 
-  /**
-   * ctrl+c clears a half-typed prompt before it quits the app. Returning true consumes
-   * the key so the layer stops searching; returning false lets it fall through to the
-   * provider, which destroys the renderer.
-   */
   useEffect(() => {
     setResponder(LAYER.base, () => {
-      if (disabled) return false;
-
       const textarea = textareaRef.current;
       if (textarea && textarea.plainText.length > 0) {
         textarea.setText("");
+        return true;
+      }
+
+      const cancel = onCancelRef.current;
+      if (cancel) {
+        cancel();
         return true;
       }
       return false;
     });
 
     return () => setResponder(LAYER.base, null);
-  }, [disabled, setResponder]);
+  }, [setResponder]);
 
   return (
     <box flexDirection="column">
@@ -146,7 +150,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
         <text fg={colors.dimSeparator}>{">"}</text>
         <textarea
           ref={textareaRef}
-          focused={!disabled && (isTopLayer(LAYER.base) || isTopLayer(LAYER.command))}
+          focused={isTopLayer(LAYER.base) || isTopLayer(LAYER.command)}
           keyBindings={TEXTAREA_KEY_BINDINGS}
           placeholder="Ask anything"
           placeholderColor={colors.dimSeparator}
@@ -155,7 +159,7 @@ export function InputBar({ disabled = false, onSubmit }: InputBarProps) {
         />
       </box>
       <box paddingLeft={2}>
-        <text fg={colors.dimSeparator}>ctrl+c to quit</text>
+        <text fg={colors.dimSeparator}>{onCancel ? "ctrl+c to go back" : "ctrl+c to quit"}</text>
       </box>
     </box>
   );

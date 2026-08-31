@@ -10,13 +10,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cattiva/shared": "workspace:*",
     "@opentui/core": "^0.5.8",
     "@opentui/react": "^0.5.8",
+    "hono": "^4.13.5",
     "opentui-spinner": "^0.0.7",
     "react": "^19.2.6",
-    "react-router": "^8.3.1"
+    "react-router": "^8.3.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@cattiva/server": "workspace:*",
     "@types/bun": "latest",
     "@types/react": "^19.2.18"
   },

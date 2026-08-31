@@ -6,6 +6,7 @@ import { Spinner } from "../spinner";
 type Props = {
   children?: ReactNode;
   onSubmit: (text: string) => void;
+  onCancel?: () => void;
   inputDisabled?: boolean;
   loading?: boolean;
 };
@@ -13,6 +14,7 @@ type Props = {
 export function SessionShell({
   children,
   onSubmit,
+  onCancel,
   inputDisabled = false,
   loading = false,
 }: Props) {
@@ -45,7 +47,7 @@ export function SessionShell({
           {loading ? <Spinner /> : null}
         </box>
 
-        <InputBar onSubmit={onSubmit} disabled={inputDisabled} />
+        <InputBar onSubmit={onSubmit} onCancel={onCancel} disabled={inputDisabled} />
       </box>
     </box>
   );

@@ -1,13 +1,24 @@
+import { createSession } from "@/lib/sessions";
+import { SessionPicker } from "@/components/dialogs/session-picker";
 import { ThemePicker } from "@/components/dialogs/theme-picker";
 import type { Command } from "@/types/commandMenu";
 
 export const COMMANDS: Command[] = [
   {
     name: "new",
-    description: "Create a new memory engine session",
+    description: "Start a new conversation",
     value: "/new",
-    action: (ctx) => {
-      ctx.toast.show({ message: "Starting new conversation" });
+    action: async (ctx) => {
+      try {
+        const session = await createSession();
+        ctx.toast.show({ variant: "success", message: "Session created" });
+        ctx.navigate(`/sessions/${session.id}`, { state: { session } });
+      } catch (error) {
+        ctx.toast.show({
+          variant: "error",
+          message: error instanceof Error ? error.message : "Failed to create session",
+        });
+      }
     },
   },
   {
@@ -29,6 +40,12 @@ export const COMMANDS: Command[] = [
     name: "session",
     description: "Switch between saved sessions",
     value: "/session",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Switch Session",
+        children: <SessionPicker />,
+      });
+    },
   },
   {
     name: "models",

@@ -27,7 +27,9 @@
     "memory:eval": "bun run mcp/memory/eval/locomo.ts",
     "memory:eval:save": "bun run mcp/memory/eval/locomo.ts --save",
     "memory:eval:compare": "bun run mcp/memory/eval/compare.ts",
-    "memory:release": "bun run --filter @cattiva/ltm-mcp pack:dry"
+    "memory:release": "bun run --filter @cattiva/ltm-mcp pack:dry",
+    "server:dev": "bun run --filter @cattiva/server dev",
+    "server:start": "bun run --filter @cattiva/server start"
   },
   "devDependencies": {
     "@types/bun": "latest",
