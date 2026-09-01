@@ -1,4 +1,9 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["bun.lock"]
+  "ignorePatterns": [
+    "bun.lock",
+    "packages/database/src/prisma/contract.json",
+    "packages/database/src/prisma/contract.d.ts",
+    "packages/database/migrations/**"
+  ]
 }

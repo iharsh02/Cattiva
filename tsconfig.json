@@ -4,5 +4,5 @@
   // aliases, so it is checked through apps/cli/tsconfig.json instead.
   // Per-package configs extend tsconfig.base.json and scope checks to one package.
   "extends": "./tsconfig.base.json",
-  "include": ["mcp/*/src/**/*", "mcp/*/eval/**/*", "packages/*/src/**/*", "*.ts"]
+  "include": ["mcp/*/src/**/*", "mcp/*/eval/**/*", "packages/*/src/**/*", "packages/*/*.ts", "*.ts"]
 }

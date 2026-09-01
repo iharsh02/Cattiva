@@ -1,0 +1,36 @@
+{
+  "name": "@cattiva/database",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./enums": "./src/enums.ts"
+  },
+  "scripts": {
+    "contract:emit": "prisma contract emit",
+    "contract:format": "prisma contract format",
+    "db:init": "prisma db init",
+    "db:migrate": "prisma db migrate",
+    "db:schema": "prisma db schema",
+    "db:update": "prisma db update",
+    "db:verify": "prisma db verify",
+    "migration:list": "prisma migration list",
+    "migration:plan": "prisma migration plan",
+    "migration:show": "prisma migration show",
+    "migration:status": "prisma migration status",
+    "skills:sync": "prisma skills sync || exit 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "8.0.0-rc.8",
+    "temporal-polyfill": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "dotenv": "^17.4.2",
+    "prisma": "8.0.0-rc.12"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

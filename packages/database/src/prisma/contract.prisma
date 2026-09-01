@@ -1,0 +1,45 @@
+enum Role {
+  USER
+  ASSISTANT
+  ERROR
+}
+
+enum Mode {
+  BUILD
+  PLAN
+}
+
+enum MessageStatus {
+  COMPLETE
+  INTERRUPTED
+}
+
+model Session {
+  id        String @id @default(cuid(2))
+  userId    String
+  title     String
+  cwd       String?
+  createdAt temporal.createdAtString()
+  updatedAt temporal.updatedAtString()
+
+  messages Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id        String @id @default(cuid(2))
+  sessionId String
+  role      Role
+  status    MessageStatus
+  model     String
+  content   String
+  parts     Jsonb?
+  mode      Mode
+  duration  Int?
+  createdAt temporal.createdAtString()
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}

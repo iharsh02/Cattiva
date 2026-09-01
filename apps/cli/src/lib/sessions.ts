@@ -2,13 +2,13 @@ import { DEFAULT_CHAT_MODEL_ID } from "@cattiva/shared";
 import { apiClient } from "./apiClient";
 import { getErrormessage } from "./httpError";
 
-/** Every message the CLI sends is the user's, typed in the prompt. */
-const userMessage = (content: string) => ({
-  role: "USER",
-  content,
-  mode: "BUILD",
-  model: DEFAULT_CHAT_MODEL_ID,
-});
+const userMessage = (content: string) =>
+  ({
+    role: "USER",
+    content,
+    mode: "BUILD",
+    model: DEFAULT_CHAT_MODEL_ID,
+  }) as const;
 
 export async function createSession(message?: string) {
   const res = await apiClient.sessions.$post({
