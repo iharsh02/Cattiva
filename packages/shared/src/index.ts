@@ -3,7 +3,7 @@ export {
   DEFAULT_CHAT_MODEL_ID,
   findSupportedChatModel,
   type ModelPricing,
-  type supportedProvider,
+  type SupportedProvider,
   type SupportedChatModel,
   type SupportedChatModelId,
 } from "./model";

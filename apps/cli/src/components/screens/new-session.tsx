@@ -36,12 +36,15 @@ export function NewSession() {
 
     const start = async () => {
       try {
-        const session = await createSession(state.message);
+        const session = await createSession();
 
         if (ignore) return;
 
         toast.show({ variant: "success", message: "Session created" });
-        navigate(`/sessions/${session.id}`, { replace: true, state: { session } });
+        navigate(`/sessions/${session.id}`, {
+          replace: true,
+          state: { session, pending: state.message },
+        });
       } catch (err) {
         if (ignore) return;
 

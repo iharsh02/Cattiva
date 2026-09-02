@@ -1,6 +1,7 @@
 import { createSession } from "@/lib/sessions";
 import { SessionPicker } from "@/components/dialogs/session-picker";
 import { ThemePicker } from "@/components/dialogs/theme-picker";
+import { ModelPicker } from "@/components/dialogs/model-picker";
 import type { Command } from "@/types/commandMenu";
 
 export const COMMANDS: Command[] = [
@@ -48,9 +49,15 @@ export const COMMANDS: Command[] = [
     },
   },
   {
-    name: "models",
+    name: "model",
     description: "Choose the model this session runs against",
-    value: "/models",
+    value: "/model",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Select Model",
+        children: <ModelPicker />,
+      });
+    },
   },
   {
     name: "agents",

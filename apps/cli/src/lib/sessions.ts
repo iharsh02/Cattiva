@@ -1,21 +1,13 @@
-import { DEFAULT_CHAT_MODEL_ID } from "@cattiva/shared";
 import { apiClient } from "./apiClient";
 import { getErrormessage } from "./httpError";
 
-const userMessage = (content: string) =>
-  ({
-    role: "USER",
-    content,
-    mode: "BUILD",
-    model: DEFAULT_CHAT_MODEL_ID,
-  }) as const;
-
-export async function createSession(message?: string) {
+/**
+ * Sessions start empty: the first user turn goes through the chat stream, which is what
+ * records it and titles the session from it.
+ */
+export async function createSession() {
   const res = await apiClient.sessions.$post({
-    json: {
-      cwd: process.cwd(),
-      ...(message ? { initialMessage: userMessage(message) } : {}),
-    },
+    json: { cwd: process.cwd() },
   });
 
   if (!res.ok) {
@@ -27,19 +19,6 @@ export async function createSession(message?: string) {
 
 export async function fetchSession(id: string) {
   const res = await apiClient.sessions[":id"].$get({ param: { id } });
-
-  if (!res.ok) {
-    throw new Error(await getErrormessage(res));
-  }
-
-  return res.json();
-}
-
-export async function sendMessage(sessionId: string, content: string) {
-  const res = await apiClient.sessions[":id"].messages.$post({
-    param: { id: sessionId },
-    json: userMessage(content),
-  });
 
   if (!res.ok) {
     throw new Error(await getErrormessage(res));
