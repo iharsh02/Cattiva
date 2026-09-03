@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { Command } from "@/types/commandMenu";
+import { commandPrefix } from "@/utils/command-input";
 import { filterCommands } from "@/utils/filter-commands";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 
@@ -11,7 +12,8 @@ type UseCommandMenuReturn = {
   selectedIndex: number;
   scrollRef: RefObject<ScrollBoxRenderable | null>;
   handleContentChange: (text: string) => void;
-  resolveCommand: (index: number) => Command | undefined;
+  isCommandInput: (text: string) => boolean;
+  resolveCommand: (text: string, index: number) => Command | undefined;
   setSelectedIndex: (index: number) => void;
 };
 
@@ -21,9 +23,8 @@ export function useCommandMenu(): UseCommandMenuReturn {
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
   const { push, pop, isTopLayer } = useKeyboardLayer();
-  const commandQuery = showCommandMenu && textValue.startsWith("/") ? textValue.slice(1) : "";
 
-  const filteredCommands = useMemo(() => filterCommands(commandQuery), [commandQuery]);
+  const commandQuery = showCommandMenu ? (commandPrefix(textValue) ?? "") : "";
 
   const closeCommandMenu = useCallback(() => {
     setShowCommandMenu(false);
@@ -44,9 +45,7 @@ export function useCommandMenu(): UseCommandMenuReturn {
       setSelectedIndex(0);
       scrollRef.current?.scrollTo(0);
 
-      // A command is only being typed while the text is one unbroken "/word".
-      const prefix = text.startsWith("/") ? text.slice(1) : null;
-      if (prefix !== null && !prefix.includes(" ")) {
+      if (commandPrefix(text) !== null) {
         openCommandMenu();
       } else {
         closeCommandMenu();
@@ -55,13 +54,23 @@ export function useCommandMenu(): UseCommandMenuReturn {
     [openCommandMenu, closeCommandMenu],
   );
 
+  const isCommandInput = useCallback((text: string) => commandPrefix(text) !== null, []);
+
   const resolveCommand = useCallback(
-    (index: number): Command | undefined => {
-      const command = filteredCommands[index];
+    (text: string, index: number): Command | undefined => {
+      const prefix = commandPrefix(text);
+      if (prefix === null) return undefined;
+
+      // The visible menu was rendered from `textValue`. If the live text has moved past it,
+      // the highlighted row belongs to a different list, so the only row that means anything
+      // is the first match for what was actually typed.
+      const row = text === textValue ? index : 0;
+
+      const command = filterCommands(prefix)[row];
       if (command) closeCommandMenu();
       return command;
     },
-    [filteredCommands, closeCommandMenu],
+    [closeCommandMenu, textValue],
   );
 
   /** Rows are one line tall, so scrollTop counts rows. */
@@ -79,6 +88,8 @@ export function useCommandMenu(): UseCommandMenuReturn {
   useKeyboard((key) => {
     if (!showCommandMenu || !isTopLayer(LAYER.command)) return;
 
+    const count = filterCommands(commandQuery).length;
+
     if (key.name === "escape") {
       key.preventDefault();
       closeCommandMenu();
@@ -89,7 +100,7 @@ export function useCommandMenu(): UseCommandMenuReturn {
       scrollIntoView(next);
     } else if (key.name === "down") {
       key.preventDefault();
-      const next = Math.min(filteredCommands.length - 1, selectedIndex + 1);
+      const next = Math.min(count - 1, selectedIndex + 1);
       setSelectedIndex(next);
       scrollIntoView(next);
     }
@@ -101,6 +112,7 @@ export function useCommandMenu(): UseCommandMenuReturn {
     selectedIndex,
     scrollRef,
     handleContentChange,
+    isCommandInput,
     resolveCommand,
     setSelectedIndex,
   };

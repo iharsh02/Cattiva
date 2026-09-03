@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { useDialog } from "@/providers/dialog";
+import { useSession } from "@/providers/session";
 import { useTheme } from "@/providers/theme";
 import { apiClient } from "@/lib/apiClient";
 import { getErrormessage } from "@/lib/httpError";
@@ -17,8 +17,8 @@ function newestFirst(sessions: SessionSummary[]): SessionSummary[] {
 }
 
 export function SessionPicker() {
-  const navigate = useNavigate();
   const { close } = useDialog();
+  const { load: loadSession } = useSession();
   const { colors } = useTheme();
 
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
@@ -55,9 +55,9 @@ export function SessionPicker() {
   const select = useCallback(
     (session: SessionSummary) => {
       close();
-      navigate(`/sessions/${session.id}`);
+      loadSession(session.id);
     },
-    [close, navigate],
+    [close, loadSession],
   );
 
   if (error) {

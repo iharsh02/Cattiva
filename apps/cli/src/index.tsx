@@ -2,28 +2,10 @@ import "@opentui/react/runtime-plugin-support";
 import { CliRenderEvents, createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { version } from "../package.json";
-import { createMemoryRouter, RouterProvider } from "react-router";
 import { RootLayout } from "./layout/root-layout";
-import { Home } from "@/components/screens/home";
-import { NewSession } from "@/components/screens/new-session";
-import { Session } from "./components/screens/session";
 
-const router = createMemoryRouter([
-  {
-    path: "/",
-    element: <RootLayout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: "sessions/new", element: <NewSession /> },
-      {
-        path: "sessions/:id",
-        element: <Session />,
-      },
-    ],
-  },
-]);
 function App() {
-  return <RouterProvider router={router} />;
+  return <RootLayout />;
 }
 
 const args = process.argv.slice(2);

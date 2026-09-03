@@ -9,11 +9,14 @@ const DIR = cwd === home ? "~" : cwd.startsWith(home + sep) ? `~${cwd.slice(home
 
 export function StatusBar() {
   const { colors } = useTheme();
-  const { model } = useModel();
+  const { model, reasoning } = useModel();
 
   return (
     <box flexDirection="column">
-      <text fg={colors.primary}>{model.id}</text>
+      <box flexDirection="row" gap={1}>
+        <text fg={colors.primary}>{model.id}</text>
+        <text fg={colors.dimSeparator}>{`· reasoning ${reasoning}`}</text>
+      </box>
       <text fg={colors.dimSeparator}>{DIR}</text>
     </box>
   );

@@ -1,8 +1,10 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  clampReasoningLevel,
   DEFAULT_CHAT_MODEL_ID,
   SUPPORTED_CHAT_MODELS,
+  type ReasoningLevel,
   type SupportedChatModel,
 } from "@cattiva/shared";
 
@@ -13,7 +15,9 @@ const DEFAULT_MODEL: SupportedChatModel =
 
 type ModelContextValue = {
   model: SupportedChatModel;
+  reasoning: ReasoningLevel;
   setModel: (model: SupportedChatModel) => void;
+  setReasoning: (reasoning: ReasoningLevel) => void;
 };
 
 const ModelContext = createContext<ModelContextValue | null>(null);
@@ -32,9 +36,20 @@ type ModelProviderProps = {
 };
 
 export function ModelProvider({ children }: ModelProviderProps) {
-  const [model, setModel] = useState<SupportedChatModel>(DEFAULT_MODEL);
+  const [model, setModelState] = useState<SupportedChatModel>(DEFAULT_MODEL);
+  const [reasoning, setReasoningState] = useState<ReasoningLevel>(DEFAULT_MODEL.defaultReasoning);
 
-  const value = useMemo(() => ({ model, setModel }), [model]);
+  const setModel = useCallback((next: SupportedChatModel) => {
+    setModelState(next);
+    setReasoningState((current) => clampReasoningLevel(next, current));
+  }, []);
+
+  const setReasoning = setReasoningState;
+
+  const value = useMemo(
+    () => ({ model, reasoning, setModel, setReasoning }),
+    [model, reasoning, setModel, setReasoning],
+  );
 
   return <ModelContext.Provider value={value}>{children}</ModelContext.Provider>;
 }

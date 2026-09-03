@@ -1,7 +1,7 @@
-import { createSession } from "@/lib/sessions";
 import { SessionPicker } from "@/components/dialogs/session-picker";
 import { ThemePicker } from "@/components/dialogs/theme-picker";
 import { ModelPicker } from "@/components/dialogs/model-picker";
+import { ReasoningPicker } from "@/components/dialogs/reasoning-picker";
 import type { Command } from "@/types/commandMenu";
 
 export const COMMANDS: Command[] = [
@@ -9,33 +9,10 @@ export const COMMANDS: Command[] = [
     name: "new",
     description: "Start a new conversation",
     value: "/new",
-    action: async (ctx) => {
-      try {
-        const session = await createSession();
-        ctx.toast.show({ variant: "success", message: "Session created" });
-        ctx.navigate(`/sessions/${session.id}`, { state: { session } });
-      } catch (error) {
-        ctx.toast.show({
-          variant: "error",
-          message: error instanceof Error ? error.message : "Failed to create session",
-        });
-      }
+    action: (ctx) => {
+      ctx.session.reset();
+      ctx.toast.show({ variant: "success", message: "Started a new conversation" });
     },
-  },
-  {
-    name: "usage",
-    description: "Show token usage and cost for this session",
-    value: "/usage",
-  },
-  {
-    name: "logout",
-    description: "Sign out and forget the stored credentials",
-    value: "/logout",
-  },
-  {
-    name: "login",
-    description: "Sign in and store the credentials",
-    value: "/login",
   },
   {
     name: "session",
@@ -60,13 +37,13 @@ export const COMMANDS: Command[] = [
     },
   },
   {
-    name: "agents",
-    description: "List and configure the available agents",
-    value: "/agents",
+    name: "reasoning",
+    description: "Set how many thinking tokens the model may spend",
+    value: "/reasoning",
     action: (ctx) => {
       ctx.dialog.open({
-        title: "Select Mode",
-        children: <text>Agent Selection window</text>,
+        title: "Reasoning Effort",
+        children: <ReasoningPicker />,
       });
     },
   },

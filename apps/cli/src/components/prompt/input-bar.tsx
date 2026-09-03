@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyBinding, TextareaRenderable } from "@opentui/core";
 import { useRenderer } from "@opentui/react";
-import { useNavigate } from "react-router";
 import { useTheme } from "@/providers/theme";
 import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
@@ -9,6 +8,7 @@ import type { Command } from "@/types/commandMenu";
 import { useToast } from "@/providers/toast";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 import { useDialog } from "@/providers/dialog";
+import { useSession } from "@/providers/session";
 
 export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "return", action: "submit" },
@@ -17,17 +17,9 @@ export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "enter", shift: true, action: "newline" },
 ];
 
-type InputBarProps = {
-  disabled?: boolean;
-  onSubmit?: (text: string) => void;
-  onCancel?: () => void;
-};
-
-export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps) {
+export function InputBar() {
   const textareaRef = useRef<TextareaRenderable>(null);
   const onSubmitRef = useRef<() => void>(() => {});
-  const onCancelRef = useRef<(() => void) | undefined>(undefined);
-  onCancelRef.current = onCancel;
   const renderer = useRenderer();
 
   const {
@@ -36,6 +28,7 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
     selectedIndex,
     scrollRef,
     handleContentChange,
+    isCommandInput,
     resolveCommand,
     setSelectedIndex,
   } = useCommandMenu();
@@ -43,9 +36,9 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
   const toast = useToast();
   const { colors } = useTheme();
   const dialog = useDialog();
+  const session = useSession();
 
   const { setResponder, isTopLayer } = useKeyboardLayer();
-  const navigate = useNavigate();
 
   /** Tearing down the renderer is the whole quit: index.tsx exits on its DESTROY. */
   const exitApp = useCallback(() => renderer.destroy(), [renderer]);
@@ -56,18 +49,17 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
       if (!textarea || !command) return;
 
       textarea.setText("");
-
-      if (command.action) {
-        command.action({ exit: exitApp, toast, dialog, navigate });
-      } else {
-        textarea.insertText(`${command.value} `);
-      }
+      command.action({ exit: exitApp, toast, dialog, session });
     },
-    [exitApp, toast, dialog, navigate],
+    [exitApp, toast, dialog, session],
   );
 
   const handleCommandExecute = useCallback(
-    (index: number) => handleCommand(resolveCommand(index)),
+    (index: number) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      handleCommand(resolveCommand(textarea.plainText.trim(), index));
+    },
     [handleCommand, resolveCommand],
   );
 
@@ -84,14 +76,14 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
     const text = textarea.plainText.trim();
     if (text.length === 0) return;
 
-    if (disabled) {
-      toast.show({ variant: "info", message: "Sending is not wired up yet" });
+    if (session.busy) {
+      toast.show({ variant: "info", message: "Still working on the last turn" });
       return;
     }
 
-    onSubmit?.(text);
+    session.send(text);
     textarea.setText("");
-  }, [disabled, onSubmit, toast]);
+  }, [session, toast]);
 
   // Bound once; the ref below keeps the body current without rebinding every render.
   useEffect(() => {
@@ -101,8 +93,22 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
   }, []);
 
   onSubmitRef.current = () => {
-    if (showCommandMenu) {
-      handleCommand(resolveCommand(selectedIndex));
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Read straight off the textarea: a command pasted in one burst submits before
+    // onContentChange has run, so render state does not yet know a command is being typed.
+    // Trimmed, or a trailing space would sink "/model " into the model as a chat message.
+    const text = textarea.plainText.trim();
+
+    if (isCommandInput(text)) {
+      const command = resolveCommand(text, selectedIndex);
+
+      if (command) {
+        handleCommand(command);
+      } else {
+        toast.show({ variant: "info", message: "No such command" });
+      }
       return;
     }
 
@@ -114,12 +120,6 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
       const textarea = textareaRef.current;
       if (textarea && textarea.plainText.length > 0) {
         textarea.setText("");
-        return true;
-      }
-
-      const cancel = onCancelRef.current;
-      if (cancel) {
-        cancel();
         return true;
       }
       return false;
@@ -159,7 +159,7 @@ export function InputBar({ disabled = false, onSubmit, onCancel }: InputBarProps
         />
       </box>
       <box paddingLeft={2}>
-        <text fg={colors.dimSeparator}>{onCancel ? "ctrl+c to go back" : "ctrl+c to quit"}</text>
+        <text fg={colors.dimSeparator}>ctrl+c to quit</text>
       </box>
     </box>
   );

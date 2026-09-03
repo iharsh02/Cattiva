@@ -1,6 +1,7 @@
 import {
   chatStreamEventSchema,
   type ChatStreamEvent,
+  type ReasoningLevel,
   type SupportedChatModelId,
 } from "@cattiva/shared";
 import { apiClient } from "./apiClient";
@@ -55,16 +56,25 @@ export async function* readChatStream(
   }
 }
 
-export async function* streamChatTurn(
-  sessionId: string,
-  content: string,
-  model: SupportedChatModelId,
-  signal?: AbortSignal,
-): AsyncGenerator<ChatStreamEvent> {
+export type ChatTurnRequest = {
+  sessionId: string;
+  content: string;
+  model: SupportedChatModelId;
+  reasoning: ReasoningLevel;
+  signal?: AbortSignal;
+};
+
+export async function* streamChatTurn({
+  sessionId,
+  content,
+  model,
+  reasoning,
+  signal,
+}: ChatTurnRequest): AsyncGenerator<ChatStreamEvent> {
   const res = await apiClient.chat[":id"].$post(
     {
       param: { id: sessionId },
-      json: { content, mode: "BUILD", model },
+      json: { content, mode: "BUILD", model, reasoning },
     },
     { init: { signal } },
   );
