@@ -27,7 +27,7 @@ reading both decides.
 
 ## Install
 
-Requires [Bun](https://bun.com).
+Requires [Bun](https://bun.com) 1.3 or newer.
 
 ```json
 {
@@ -60,8 +60,36 @@ that is local.
 The database and its parent directory are created on first use. There is nothing to
 install or run — SQLite is a file, not a server.
 
-Changing `CATTIVA_EMBED_MODEL` is safe: the store notices the model changed and rebuilds
-its vector index from the stored text on the next open.
+### Models
+
+The two model variables accept a fixed registry, not an arbitrary Hugging Face id. An
+unknown value **throws on startup** with the list of known ones, rather than failing later
+in a way you would have to debug.
+
+| `CATTIVA_EMBED_MODEL`                | Dimensions | Notes            |
+| ------------------------------------ | ---------- | ---------------- |
+| `Xenova/bge-small-en-v1.5`           | 384        | default, 34MB    |
+| `Supabase/gte-small`                 | 384        |                  |
+| `Xenova/all-MiniLM-L6-v2`            | 384        |                  |
+| `Xenova/gte-base`                    | 768        |                  |
+| `Xenova/bge-base-en-v1.5`            | 768        |                  |
+| `mixedbread-ai/mxbai-embed-large-v1` | 1024       | largest, slowest |
+
+| `CATTIVA_RERANK_MODEL`                 | Size   |
+| -------------------------------------- | ------ |
+| `Xenova/ms-marco-MiniLM-L-6-v2`        | ~23MB  |
+| `Xenova/ms-marco-MiniLM-L-12-v2`       | ~34MB  |
+| `mixedbread-ai/mxbai-rerank-xsmall-v1` | ~71MB  |
+| `Xenova/bge-reranker-base`             | ~278MB |
+
+**Encoder models only.** Decoder-only embedders — Qwen3-Embedding and similar — need
+last-token pooling rather than the mean, which the provider cannot do. Routing one through
+it yields plausible-looking wrong vectors and _no error_, which is why the registry is a
+closed list. Adding a model means adding it to `MODELS` in `src/config.ts` with its vector
+width.
+
+Changing `CATTIVA_EMBED_MODEL` is otherwise safe: the store notices the model changed and
+rebuilds its vector index from the stored text on the next open.
 
 ## How it works
 
@@ -113,6 +141,28 @@ sqlite3 ~/.cattiva/memory.db "SELECT id, memory_type, content FROM memories;"
 
 Worth doing regularly — reading what the agent _chose_ to store is the fastest way to tell
 whether the tool descriptions are working.
+
+Two optional [skills](https://github.com/iharsh02/cattiva/tree/main/skills) do this
+conversationally: `/memory-review` lists everything grouped by type, and `/memory-audit`
+finds duplicates, entries that aren't self-contained, and contradictions.
+
+## Development
+
+From the repo root:
+
+```bash
+bun install
+bun run memory:dev           # run the server directly on stdio
+bun run memory:eval          # score retrieval against LoCoMo
+bun run memory:release       # build and dry-run the package
+```
+
+`.mcp.json` at the repo root points at this source, so opening the repo in Claude Code
+connects the server you're editing rather than the published package.
+
+Source layout: `config.ts` holds every user-facing default and the model registry;
+`store.ts` owns the SQLite schema and the tuning constants that only make sense beside it;
+`retrieval.ts` fuses and reranks; `embedder.ts` and `reranker.ts` wrap transformers.js.
 
 ## License
 

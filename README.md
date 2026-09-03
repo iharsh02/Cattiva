@@ -1,17 +1,93 @@
 # Cattiva
 
-A suite of toolkits for AI agents, exposed over [MCP](https://modelcontextprotocol.io).
+A terminal agent shell
 
-Each server lives under `mcp/`, usable from Claude Code, Codex, Cursor, or anything else
-that speaks MCP.
 
-## Servers
+| Part                       | Package            | What it is                                                                     |
+| -------------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| [`apps/cli`](apps/cli)     | `@cattiva/cli`     | A terminal chat UI with persistent, resumable sessions. Early, in development  |
+| [`mcp/memory`](mcp/memory) | `@cattiva/ltm-mcp` | Long-term memory over [MCP](https://modelcontextprotocol.io). Published to npm |
 
-| Server                     | Package            | What it does                                                                            |
-| -------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
-| [`mcp/memory`](mcp/memory) | `@cattiva/ltm-mcp` | Long-term memory: store, retrieve, update and delete facts that survive across sessions |
+The two are independent — the CLI does not use the memory server, and the memory server needs
+nothing from this repo. The memory half is the more finished one: installable in one line, no
+database, no API key, and its retrieval quality is [measured](#retrieval-quality) rather than
+asserted. If that is what you came for, skip to [Long-term memory](#long-term-memory).
 
-## Install
+---
+
+## The CLI
+
+A single-window terminal chat: you type, the reply streams in below it, and the conversation
+stays in the same view. Sessions are written to Postgres, so you can close the CLI and pick a
+conversation back up later.
+
+**What works today:** streaming replies, session persistence and resume, switching model and
+reasoning effort mid-session, 32 themes.
+
+**What does not, yet:** the model has no tools — it cannot read or edit files, run commands,
+or take any action. This is a chat shell with good session handling, not yet a coding agent.
+Reasoning and tool-call events already stream from the server but nothing renders them, and
+the `BUILD`/`PLAN` mode in the schema is unused.
+
+### Setup
+
+Requires [Bun](https://bun.com), Docker (for Postgres), and an API key for whichever provider
+you use. Gemini has a [free tier](https://aistudio.google.com/apikey).
+
+```bash
+bun install
+cp .env.example .env          # then fill in an API key
+docker run --name cattiva-postgres -e POSTGRES_PASSWORD=mysecretpassword \
+  -p 5432:5432 -d postgres
+bun db:init                   # create the schema from the contract
+```
+
+Then run the server and the CLI in two terminals:
+
+```bash
+bun run server:dev            # session + chat API on :3000
+bun run cli:start             # the terminal UI
+```
+
+### Commands
+
+Type `/` in the prompt to open the menu. Every command in it works — one that does nothing
+yet is a broken feature, not a missing one, so it is not listed.
+
+| Command      | What it does                                     |
+| ------------ | ------------------------------------------------ |
+| `/new`       | Clear the conversation and start fresh           |
+| `/session`   | Switch to a saved session, loaded in place       |
+| `/model`     | Choose the model this session runs against       |
+| `/reasoning` | Set how many thinking tokens the model may spend |
+| `/theme`     | Switch the colour theme                          |
+| `/exit`      | Quit                                             |
+
+### Models
+
+| Model               | Provider  | Key                            |
+| ------------------- | --------- | ------------------------------ |
+| `gemini-2.5-flash`  | Google    | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| `claude-sonnet-4-6` | Anthropic | `ANTHROPIC_API_KEY`            |
+| `claude-opus-4-6`   | Anthropic | `ANTHROPIC_API_KEY`            |
+| `claude-opus-5`     | Anthropic | `ANTHROPIC_API_KEY`            |
+
+Each declares which reasoning levels it offers — `off`, `low`, `medium`, `high` — and which
+it defaults to. `/reasoning` maps the level onto the provider's own control: Anthropic's
+thinking budget, Gemini's `thinkingConfig`. Turning it off removes the several seconds a
+thinking model spends before its first word.
+
+Replies are re-cut into words before they leave the server. Providers hand back whole
+sentences at a time — Gemini answers a short question in about five chunks — which arrives as
+visible slabs rather than streaming text.
+
+---
+
+## Long-term memory
+
+Facts stored in one session are retrievable in the next, in a different process, days later.
+
+### Install
 
 Requires [Bun](https://bun.com). Add to your MCP config — `.mcp.json` for Claude Code,
 `~/.codex/config.toml` for Codex, or the equivalent for your host:
@@ -28,13 +104,15 @@ Requires [Bun](https://bun.com). Add to your MCP config — `.mcp.json` for Clau
 ```
 
 Restart your agent. Nothing else to install — no database to run, no API key. The first
-memory downloads a ~34MB embedding model and the first search a ~23MB reranker, then it
-works offline. Nothing you store leaves the machine.
+memory downloads a ~34MB embedding model and the first search a ~23MB reranker, then it works
+offline. Nothing you store leaves the machine.
 
 By default memories live in `~/.cattiva/memory.db`. Set `CATTIVA_MEMORY_DB` to keep them
-per-project instead.
+per-project instead. Four tools — `add_memory`, `retrieve_memory`, `update_memory`,
+`delete_memory` — are documented in the [server README](mcp/memory/README.md), along with
+every configuration variable and how retrieval works.
 
-## Retrieval quality
+### Retrieval quality
 
 Retrieval is measured, not asserted. The [eval](mcp/memory/eval) runs against
 [LoCoMo](https://github.com/snap-research/locomo) — 10 multi-session conversations, 5,882
@@ -46,26 +124,25 @@ turns, 1,977 questions with hand-labelled evidence:
 | \+ hybrid lexical search   | 0.337     | 0.536 | 0.484    | 0.713  | 0.655     | 0.455 |
 | \+ cross-encoder reranking | **0.496** | 0.662 | 0.604    | 0.772  | **0.718** | 0.590 |
 
-**The right memory comes back first 50% of the time, up from 28%.** Three decisions came
-out of the measurements:
+**The right memory comes back first 50% of the time, up from 28%.** Three decisions came out
+of the measurements:
 
-- **Hybrid retrieval.** Dense vectors cannot match a name the model has never seen, so
-  SQLite FTS5 runs alongside them and the two rankings are fused.
+- **Hybrid retrieval.** Dense vectors cannot match a name the model has never seen, so SQLite
+  FTS5 runs alongside them and the two rankings are fused.
 - **Reranking is on by default.** A ~23MB cross-encoder re-reads the top 30 candidates and
   reorders them, worth +0.16 `hit@1` for roughly 200ms per retrieval. `CATTIVA_RERANK=0`
   turns it off.
 - **`retrieve_memory` returns `top_k=10`**, not the 3 the paper uses — hosts here have the
   context to spare, and it is worth 11 points of recall.
 
-Measured and _not_ taken: widening the candidate pool. Fetching 4x more candidates moved
-the top answer for one question in 1,977, which is how we know the cross-encoder's
-judgement — not the size of the search — is what limits this now.
+Measured and _not_ taken: widening the candidate pool. Fetching 4x more candidates moved the
+top answer for one question in 1,977, which is how we know the cross-encoder's judgement —
+not the size of the search — is what limits this now.
 
-Run it yourself with `bun run memory:eval`. See the
-[eval README](mcp/memory/eval/README.md) for the method, the per-category
-breakdown, and what the numbers do not cover.
+Run it yourself with `bun run memory:eval`. See the [eval README](mcp/memory/eval/README.md)
+for the method, the per-category breakdown, and what the numbers do not cover.
 
-## Skills
+### Skills
 
 Optional [skills](skills) for maintaining your memories.
 
@@ -91,21 +168,51 @@ dependencies.
 **Install the MCP server first.** The skills call `update_memory` and `delete_memory`; on
 their own they have nothing to talk to.
 
+---
+
+## Repository layout
+
+```
+apps/cli          @cattiva/cli        terminal UI (opentui + React)
+packages/server   @cattiva/server     session + chat API (Hono, SSE)
+packages/database @cattiva/database   Prisma 8 ORM over Postgres
+packages/shared   @cattiva/shared     model registry and wire schemas
+mcp/memory        @cattiva/ltm-mcp    the memory server, published
+skills/                               optional agent skills
+```
+
+`mcp/` holds MCP servers, one publishable package each. `packages/` holds libraries the CLI
+and servers draw on. Each has its own README.
+
 ## Development
 
 ```bash
 bun install
-bun run typecheck
+bun run typecheck    # root: packages + mcp. apps/ is checked separately
 bun run lint
 bun run format
-bun run memory:dev   # run the memory server directly on stdio
+```
+
+`typecheck` at the root deliberately skips `apps/` — the CLI needs its own JSX and path
+aliases, so it is checked through its own config:
+
+```bash
+cd apps/cli && bun run typecheck
+```
+
+Other useful scripts:
+
+```bash
+bun run server:dev   # session API with hot reload
+bun run cli:dev      # CLI with hot reload
+bun run memory:dev   # memory server directly on stdio
+bun run memory:eval  # run the LoCoMo eval
+bun db:verify        # check the live schema matches the contract
 ```
 
 [`.mcp.json`](.mcp.json) is checked in and points at the **local source**, so opening this
-repo in Claude Code connects the server you're editing rather than the published package.
-
-Repository layout: `mcp/` holds the MCP servers, one publishable package each; `apps/` holds
-the CLI; `packages/` is for shared libraries the servers and apps draw on.
+repo in Claude Code connects the memory server you're editing rather than the published
+package.
 
 ## License
 
