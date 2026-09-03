@@ -89,3 +89,30 @@ export async function* streamChatTurn({
 
   yield* readChatStream(res.body);
 }
+
+export type ResumeTurnRequest = {
+  sessionId: string;
+  signal?: AbortSignal;
+};
+
+export async function* resumeChatTurn({
+  sessionId,
+  signal,
+}: ResumeTurnRequest): AsyncGenerator<ChatStreamEvent> {
+  const res = await apiClient.chat[":id"].resume.$post(
+    { param: { id: sessionId } },
+    { init: { signal } },
+  );
+
+  if (res.status === 409) return;
+
+  if (!res.ok) {
+    throw new Error(await getErrormessage(res));
+  }
+
+  if (!res.body) {
+    throw new Error("The server sent an empty response");
+  }
+
+  yield* readChatStream(res.body);
+}

@@ -14,6 +14,13 @@ enum MessageStatus {
   INTERRUPTED
 }
 
+enum Reasoning {
+  off
+  low
+  medium
+  high
+}
+
 model Session {
   id        String @id @default(cuid(2))
   userId    String
@@ -36,6 +43,7 @@ model Message {
   content   String
   parts     Jsonb?
   mode      Mode
+  reasoning Reasoning?
   duration  Int?
   createdAt temporal.createdAtString()
 

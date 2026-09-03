@@ -15,6 +15,18 @@ export const COMMANDS: Command[] = [
     },
   },
   {
+    name: "resume",
+    description: "Answer a reply that was cut short",
+    value: "/resume",
+    action: async (ctx) => {
+      if (ctx.session.busy) return;
+
+      if (!(await ctx.session.resume())) {
+        ctx.toast.show({ variant: "info", message: "Nothing to resume" });
+      }
+    },
+  },
+  {
     name: "session",
     description: "Switch between saved sessions",
     value: "/session",

@@ -43,6 +43,27 @@
               }
             ]
           },
+          "Reasoning": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "off",
+                "value": "off"
+              },
+              {
+                "name": "low",
+                "value": "low"
+              },
+              {
+                "name": "medium",
+                "value": "medium"
+              },
+              {
+                "name": "high",
+                "value": "high"
+              }
+            ]
+          },
           "Role": {
             "codecId": "pg/text@1",
             "members": [
@@ -119,6 +140,19 @@
                   "kind": "scalar"
                 }
               },
+              "reasoning": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Reasoning",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
               "role": {
                 "nullable": false,
                 "type": {
@@ -192,6 +226,9 @@
                 },
                 "parts": {
                   "column": "parts"
+                },
+                "reasoning": {
+                  "column": "reasoning"
                 },
                 "role": {
                   "column": "role"
@@ -311,6 +348,11 @@
                   "prefix": "message_mode_check"
                 },
                 {
+                  "expression": "\"reasoning\" IN ('off', 'low', 'medium', 'high')",
+                  "name": "message_reasoning_check_448ac843",
+                  "prefix": "message_reasoning_check"
+                },
+                {
                   "expression": "\"role\" IN ('USER', 'ASSISTANT', 'ERROR')",
                   "name": "message_role_check_a1594078",
                   "prefix": "message_role_check"
@@ -366,6 +408,17 @@
                   "codecId": "pg/jsonb@1",
                   "nativeType": "jsonb",
                   "nullable": true
+                },
+                "reasoning": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Reasoning",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "role": {
                   "codecId": "pg/text@1",
@@ -502,6 +555,15 @@
                 "PLAN"
               ]
             },
+            "Reasoning": {
+              "kind": "valueSet",
+              "values": [
+                "off",
+                "low",
+                "medium",
+                "high"
+              ]
+            },
             "Role": {
               "kind": "valueSet",
               "values": [
@@ -516,7 +578,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "d74e1f90d4d0256fdf8ac65505e8d36769f0e6641dc5997f32aba11b215a11af"
+    "storageHash": "4bce35749bb8c752fb2950985b5891d28338369a0110192a5f3add541216000b"
   },
   "execution": {
     "executionHash": "f5473ba018a9e3163ec9e5548d03218a384fab8a3a2e88049be735e80b4b7dc5",

@@ -23,6 +23,7 @@ export type ResolvedModel = {
   model: LanguageModel;
   provider: SupportedProvider;
   modelId: SupportedChatModelId;
+  reasoning: ReasoningLevel;
   providerOptions: ProviderOptions;
   maxOutputTokens: number | undefined;
 };
@@ -66,6 +67,7 @@ function resolveSupportedChatModel(
         model: anthropic(model.id as AnthropicModelId),
         provider,
         modelId: model.id,
+        reasoning,
         providerOptions: anthropicThinking(reasoning),
         maxOutputTokens,
       };
@@ -74,6 +76,7 @@ function resolveSupportedChatModel(
         model: google(model.id as GoogleModelId),
         provider,
         modelId: model.id,
+        reasoning,
         providerOptions: googleThinking(reasoning),
         maxOutputTokens,
       };

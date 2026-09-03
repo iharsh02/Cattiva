@@ -16,6 +16,7 @@ import {
   type ReasoningLevel,
 } from "@cattiva/shared";
 import { isSupportedChatModelId, resolveChatModel, type ResolvedModel } from "../lib/models";
+import { MESSAGE_FIELDS, type StoredMessage } from "../lib/messages";
 import { SMOOTHING } from "../lib/smoothing";
 
 const submitSchema = z.object({
@@ -118,7 +119,12 @@ async function consumeModelStream(
           const parsed = toolCallArgsSchema.safeParse(part.input);
           const args = parsed.success ? parsed.data : {};
 
-          parts.push({ type: "tool-call", id: part.toolCallId, name: part.toolName, args });
+          parts.push({
+            type: "tool-call",
+            id: part.toolCallId,
+            name: part.toolName,
+            args,
+          });
           await sendEvent(stream, {
             type: "tool-call",
             toolCallId: part.toolCallId,
@@ -150,6 +156,34 @@ async function consumeModelStream(
   return { content, parts, aborted, failure: null };
 }
 
+type ResumePoint = {
+  pending: StoredMessage;
+  discard: string[];
+  history: StoredMessage[];
+};
+
+function findResumePoint(messages: StoredMessage[]): ResumePoint | null {
+  let end = messages.length;
+
+  while (end > 0) {
+    const row = messages[end - 1]!;
+    const wreckage =
+      row.role === "ERROR" || (row.role === "ASSISTANT" && row.status === "INTERRUPTED");
+
+    if (!wreckage) break;
+    end -= 1;
+  }
+
+  const pending = messages[end - 1];
+  if (!pending || pending.role !== "USER") return null;
+
+  return {
+    pending,
+    discard: messages.slice(end).map((message) => message.id),
+    history: messages.slice(0, end),
+  };
+}
+
 type Turn = {
   sessionId: string;
   mode: Mode;
@@ -164,6 +198,7 @@ function createMessage(input: {
   status: MessageStatus;
   model: string;
   mode: Mode;
+  reasoning: ReasoningLevel | null;
   content: string;
   parts?: MessagePart[] | null;
   duration?: number;
@@ -186,6 +221,7 @@ async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promis
     sessionId: turn.sessionId,
     model: resolved.modelId,
     mode: turn.mode,
+    reasoning: resolved.reasoning,
     duration,
   };
 
@@ -227,56 +263,116 @@ async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promis
   // Exactly one terminal event, whatever happened above.
   const terminal: ChatStreamEvent =
     reported !== null || messageId === null
-      ? { type: "error", message: reported ?? "The reply could not be recorded." }
+      ? {
+          type: "error",
+          message: reported ?? "The reply could not be recorded.",
+        }
       : { type: "done", messageId, durationMs: duration };
 
   await sendEvent(stream, terminal);
 }
 
-const app = new Hono().post("/:id", submitValidator, async (c) => {
-  const sessionId = c.req.param("id");
-  const { content, mode, model, reasoning } = c.req.valid("json");
+const app = new Hono()
+  .post("/:id/resume", async (c) => {
+    const sessionId = c.req.param("id");
+    const outcome = await db.transaction(async (tx) => {
+      const session = await tx.orm.public.Session.select("id")
+        .include("messages", (message) =>
+          message.select(...MESSAGE_FIELDS).orderBy((m) => m.createdAt.asc()),
+        )
+        .first({ id: sessionId });
 
-  const history = await db.transaction(async (tx) => {
-    const session = await tx.orm.public.Session.select("id", "title").first({ id: sessionId });
-    if (!session) return null;
+      if (!session) return { kind: "missing" } as const;
 
-    await tx.orm.public.Message.create({
-      sessionId,
-      role: "USER",
-      status: "COMPLETE",
-      content,
-      model,
-      mode,
+      const point = findResumePoint(session.messages);
+      if (!point) return { kind: "settled" } as const;
+      if (!isSupportedChatModelId(point.pending.model)) {
+        return { kind: "unsupported", model: point.pending.model } as const;
+      }
+
+      for (const id of point.discard) {
+        await tx.orm.public.Message.where({ id }).delete();
+      }
+
+      return { kind: "ready", point } as const;
     });
 
-    const title = nextTitle(session.title, content);
-    if (title !== session.title) {
-      await tx.orm.public.Session.where({ id: sessionId }).update({ title });
+    if (outcome.kind === "missing") {
+      throw new HTTPException(404, { message: "Session not found" });
     }
 
-    return await tx.orm.public.Message.where({ sessionId })
-      .select("role", "content")
-      .orderBy((m) => m.createdAt.asc())
-      .all();
-  });
+    if (outcome.kind === "settled") {
+      throw new HTTPException(409, { message: "Session has no unanswered message to resume" });
+    }
 
-  if (!history) {
-    throw new HTTPException(404, { message: "Session not found" });
-  }
+    if (outcome.kind === "unsupported") {
+      throw new HTTPException(400, {
+        message: `Session was recorded with unsupported model ${outcome.model}`,
+      });
+    }
 
-  return streamSSE(c, async (stream) => {
-    await streamAssistantReply(
-      {
+    const { pending, history } = outcome.point;
+
+    return streamSSE(c, async (stream) => {
+      await streamAssistantReply(
+        {
+          sessionId,
+          mode: pending.mode,
+          model: pending.model,
+          reasoning: pending.reasoning ?? undefined,
+          history: buildConversationHistory(history),
+        },
+        stream,
+      );
+    });
+  })
+  .post("/:id", submitValidator, async (c) => {
+    const sessionId = c.req.param("id");
+    const { content, mode, model, reasoning } = c.req.valid("json");
+
+    const history = await db.transaction(async (tx) => {
+      const session = await tx.orm.public.Session.select("id", "title").first({
+        id: sessionId,
+      });
+      if (!session) return null;
+
+      await tx.orm.public.Message.create({
         sessionId,
-        mode,
+        role: "USER",
+        status: "COMPLETE",
+        content,
         model,
-        reasoning,
-        history: buildConversationHistory(history),
-      },
-      stream,
-    );
+        mode,
+        reasoning: reasoning ?? null,
+      });
+
+      const title = nextTitle(session.title, content);
+      if (title !== session.title) {
+        await tx.orm.public.Session.where({ id: sessionId }).update({ title });
+      }
+
+      return await tx.orm.public.Message.where({ sessionId })
+        .select("role", "content")
+        .orderBy((m) => m.createdAt.asc())
+        .all();
+    });
+
+    if (!history) {
+      throw new HTTPException(404, { message: "Session not found" });
+    }
+
+    return streamSSE(c, async (stream) => {
+      await streamAssistantReply(
+        {
+          sessionId,
+          mode,
+          model,
+          reasoning,
+          history: buildConversationHistory(history),
+        },
+        stream,
+      );
+    });
   });
-});
 
 export default app;

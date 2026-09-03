@@ -5,24 +5,10 @@ import { zValidator } from "@hono/zod-validator";
 import { DEFAULT_SESSION_TITLE, findSupportedChatModel, titleFromMessage } from "@cattiva/shared";
 import { Mode, Role } from "@cattiva/database/enums";
 import { db, orm } from "@cattiva/database";
+import { MESSAGE_FIELDS } from "../lib/messages";
 
 /** Until there is auth, every session on this machine belongs to the one local user. */
 const LOCAL_USER_ID = "local";
-
-// An `include` branch projects nothing by default — without this list the relation
-// rows come back as `{ [x: string]: unknown }` and the CLI loses every message field.
-const MESSAGE_FIELDS = [
-  "id",
-  "sessionId",
-  "role",
-  "content",
-  "mode",
-  "model",
-  "status",
-  "parts",
-  "duration",
-  "createdAt",
-] as const;
 
 const messageInputSchema = z.object({
   role: z.enum(Role),
@@ -39,7 +25,6 @@ const createSessionSchema = z.object({
   initialMessage: messageInputSchema.optional(),
 });
 
-/** The first thing the user says names the session, until they title it themselves. */
 function nextTitle(current: string, message: MessageInput | undefined): string {
   if (current !== DEFAULT_SESSION_TITLE || message?.role !== "USER") return current;
   return titleFromMessage(message.content);

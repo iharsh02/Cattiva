@@ -1,0 +1,26 @@
+import type { MessageStatus, Mode, Role } from "@cattiva/database/enums";
+import type { ReasoningLevel } from "@cattiva/shared";
+
+export const MESSAGE_FIELDS = [
+  "id",
+  "sessionId",
+  "role",
+  "content",
+  "mode",
+  "reasoning",
+  "model",
+  "status",
+  "parts",
+  "duration",
+  "createdAt",
+] as const;
+
+export type StoredMessage = {
+  id: string;
+  role: Role;
+  status: MessageStatus;
+  model: string;
+  mode: Mode;
+  reasoning: ReasoningLevel | null;
+  content: string;
+};
