@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { REASONING_LEVELS } from "./model";
+
+export const reasoningLevelSchema = z.enum(REASONING_LEVELS);
 
 export const toolCallArgsSchema = z.record(z.string(), z.json());
 

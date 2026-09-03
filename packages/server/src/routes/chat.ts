@@ -8,17 +8,21 @@ import { db, orm } from "@cattiva/database";
 import { Mode, type MessageStatus, type Role } from "@cattiva/database/enums";
 import {
   DEFAULT_SESSION_TITLE,
+  reasoningLevelSchema,
   titleFromMessage,
   toolCallArgsSchema,
   type ChatStreamEvent,
   type MessagePart,
+  type ReasoningLevel,
 } from "@cattiva/shared";
 import { isSupportedChatModelId, resolveChatModel, type ResolvedModel } from "../lib/models";
+import { SMOOTHING } from "../lib/smoothing";
 
 const submitSchema = z.object({
   content: z.string().min(1),
   mode: z.enum(Mode),
   model: z.string().refine(isSupportedChatModelId, "Unsupported model"),
+  reasoning: reasoningLevelSchema.optional(),
 });
 
 const submitValidator = zValidator("json", submitSchema, (result, c) => {
@@ -87,6 +91,9 @@ async function consumeModelStream(
       model: resolved.model,
       messages: history,
       abortSignal: abortController.signal,
+      providerOptions: resolved.providerOptions,
+      maxOutputTokens: resolved.maxOutputTokens,
+      experimental_transform: SMOOTHING,
     });
 
     for await (const part of result.fullStream) {
@@ -147,6 +154,7 @@ type Turn = {
   sessionId: string;
   mode: Mode;
   model: string;
+  reasoning: ReasoningLevel | undefined;
   history: ModelMessage[];
 };
 
@@ -164,7 +172,7 @@ function createMessage(input: {
 }
 
 async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promise<void> {
-  const resolved = resolveChatModel(turn.model);
+  const resolved = resolveChatModel(turn.model, turn.reasoning);
   const startedAt = Date.now();
 
   const { content, parts, aborted, failure } = await consumeModelStream(
@@ -227,7 +235,7 @@ async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promis
 
 const app = new Hono().post("/:id", submitValidator, async (c) => {
   const sessionId = c.req.param("id");
-  const { content, mode, model } = c.req.valid("json");
+  const { content, mode, model, reasoning } = c.req.valid("json");
 
   const history = await db.transaction(async (tx) => {
     const session = await tx.orm.public.Session.select("id", "title").first({ id: sessionId });
@@ -259,7 +267,13 @@ const app = new Hono().post("/:id", submitValidator, async (c) => {
 
   return streamSSE(c, async (stream) => {
     await streamAssistantReply(
-      { sessionId, mode, model, history: buildConversationHistory(history) },
+      {
+        sessionId,
+        mode,
+        model,
+        reasoning,
+        history: buildConversationHistory(history),
+      },
       stream,
     );
   });
