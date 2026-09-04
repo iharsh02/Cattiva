@@ -73,7 +73,7 @@ function withoutAbandonedReply(messages: ChatMessage[]): ChatMessage[] {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { model, reasoning } = useModel();
+  const { mode, model, reasoning } = useModel();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -227,6 +227,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             streamChatTurn({
               sessionId: target,
               content: text,
+              mode,
               model: model.id,
               reasoning,
               signal,
@@ -235,7 +236,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         );
       });
     },
-    [localId, model.id, reasoning, runOwned, runTurn],
+    [localId, mode, model.id, reasoning, runOwned, runTurn],
   );
 
   const resume = useCallback(async (): Promise<boolean> => {

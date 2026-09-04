@@ -4,6 +4,7 @@ import {
   type ReasoningLevel,
   type SupportedChatModelId,
 } from "@cattiva/shared";
+import type { Mode } from "@cattiva/database/enums";
 import { apiClient } from "./apiClient";
 import { getErrormessage } from "./httpError";
 
@@ -32,7 +33,6 @@ export async function* readChatStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -59,6 +59,7 @@ export async function* readChatStream(
 export type ChatTurnRequest = {
   sessionId: string;
   content: string;
+  mode: Mode;
   model: SupportedChatModelId;
   reasoning: ReasoningLevel;
   signal?: AbortSignal;
@@ -67,6 +68,7 @@ export type ChatTurnRequest = {
 export async function* streamChatTurn({
   sessionId,
   content,
+  mode,
   model,
   reasoning,
   signal,
@@ -74,7 +76,7 @@ export async function* streamChatTurn({
   const res = await apiClient.chat[":id"].$post(
     {
       param: { id: sessionId },
-      json: { content, mode: "BUILD", model, reasoning },
+      json: { content, mode, model, reasoning },
     },
     { init: { signal } },
   );

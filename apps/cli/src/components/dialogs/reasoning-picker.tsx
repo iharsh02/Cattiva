@@ -45,16 +45,29 @@ export function ReasoningPicker() {
       onSelect={select}
       placeholder="Search levels"
       emptyText="No levels match"
-      renderItem={(level, isSelected) => (
-        <>
-          <text selectable={false} fg={isSelected ? colors.selection : colors.dimSeparator}>
-            {level}
-          </text>
-          <text selectable={false} fg={colors.dimSeparator}>
-            {` · ${DESCRIPTIONS[level]}`}
-          </text>
-        </>
-      )}
+      renderItem={(level, isSelected) => {
+        const dots =
+          level === "off" ? "○○○" : level === "low" ? "●○○" : level === "medium" ? "●●○" : "●●●";
+        return (
+          <>
+            <text
+              selectable={false}
+              fg={
+                isSelected
+                  ? colors.selection
+                  : level === "off"
+                    ? colors.dimSeparator
+                    : colors.thinking
+              }
+            >
+              {`${dots} ${level}`}
+            </text>
+            <text selectable={false} fg={colors.dimSeparator}>
+              {` · ${DESCRIPTIONS[level]}`}
+            </text>
+          </>
+        );
+      }}
     />
   );
 }

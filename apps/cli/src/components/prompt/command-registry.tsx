@@ -3,6 +3,7 @@ import { ThemePicker } from "@/components/dialogs/theme-picker";
 import { ModelPicker } from "@/components/dialogs/model-picker";
 import { ReasoningPicker } from "@/components/dialogs/reasoning-picker";
 import type { Command } from "@/types/commandMenu";
+import { AgentModePicker } from "../dialogs/agent-mode";
 
 export const COMMANDS: Command[] = [
   {
@@ -11,7 +12,10 @@ export const COMMANDS: Command[] = [
     value: "/new",
     action: (ctx) => {
       ctx.session.reset();
-      ctx.toast.show({ variant: "success", message: "Started a new conversation" });
+      ctx.toast.show({
+        variant: "success",
+        message: "Started a new conversation",
+      });
     },
   },
   {
@@ -24,6 +28,17 @@ export const COMMANDS: Command[] = [
       if (!(await ctx.session.resume())) {
         ctx.toast.show({ variant: "info", message: "Nothing to resume" });
       }
+    },
+  },
+  {
+    name: "agent mode",
+    description: "Switch between plan and build modes",
+    value: "/mode",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Agent Mode",
+        children: <AgentModePicker />,
+      });
     },
   },
   {

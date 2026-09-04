@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyBinding, TextareaRenderable } from "@opentui/core";
-import { useRenderer } from "@opentui/react";
+import { useRenderer, useKeyboard } from "@opentui/react";
 import { useTheme } from "@/providers/theme";
 import { useCommandMenu } from "@/hooks/useCommandMenu";
 import { CommandMenu } from "./command-menu";
@@ -9,6 +9,7 @@ import { useToast } from "@/providers/toast";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 import { useDialog } from "@/providers/dialog";
 import { useSession } from "@/providers/session";
+import { useModel } from "@/providers/model";
 
 export const TEXTAREA_KEY_BINDINGS: KeyBinding[] = [
   { name: "return", action: "submit" },
@@ -21,7 +22,7 @@ export function InputBar() {
   const textareaRef = useRef<TextareaRenderable>(null);
   const onSubmitRef = useRef<() => void>(() => {});
   const renderer = useRenderer();
-
+  const { mode, reasoning, toggleMode, setMode, setModel } = useModel();
   const {
     showCommandMenu,
     commandQuery,
@@ -40,7 +41,6 @@ export function InputBar() {
 
   const { setResponder, isTopLayer } = useKeyboardLayer();
 
-  /** Tearing down the renderer is the whole quit: index.tsx exits on its DESTROY. */
   const exitApp = useCallback(() => renderer.destroy(), [renderer]);
 
   const handleCommand = useCallback(
@@ -49,9 +49,17 @@ export function InputBar() {
       if (!textarea || !command) return;
 
       textarea.setText("");
-      command.action({ exit: exitApp, toast, dialog, session });
+      command.action({
+        exit: exitApp,
+        toast,
+        dialog,
+        session,
+        mode,
+        setMode,
+        setModel,
+      });
     },
-    [exitApp, toast, dialog, session],
+    [exitApp, toast, dialog, session, mode, setMode, setModel],
   );
 
   const handleCommandExecute = useCallback(
@@ -77,7 +85,10 @@ export function InputBar() {
     if (text.length === 0) return;
 
     if (session.busy) {
-      toast.show({ variant: "info", message: "Still working on the last turn" });
+      toast.show({
+        variant: "info",
+        message: "Still working on the last turn",
+      });
       return;
     }
 
@@ -115,6 +126,14 @@ export function InputBar() {
     handleSubmit();
   };
 
+  useKeyboard((key) => {
+    if (session.busy) return;
+    if (!isTopLayer(LAYER.base)) return;
+    if (key.name === "tab") {
+      key.preventDefault();
+      toggleMode();
+    }
+  });
   useEffect(() => {
     setResponder(LAYER.base, () => {
       const textarea = textareaRef.current;
@@ -139,7 +158,19 @@ export function InputBar() {
           onExecute={handleCommandExecute}
         />
       )}
-
+      <box flexDirection="row" gap={1} paddingLeft={1}>
+        <text fg={mode === "BUILD" ? colors.primary : colors.planMode}>{mode}</text>
+        <text fg={colors.dimSeparator}>·</text>
+        <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
+          {reasoning === "off"
+            ? "○○○ off"
+            : reasoning === "low"
+              ? "●○○ low"
+              : reasoning === "medium"
+                ? "●●○ med"
+                : "●●● high"}
+        </text>
+      </box>
       <box
         flexDirection="row"
         gap={1}
@@ -158,7 +189,9 @@ export function InputBar() {
           onContentChange={handleTextareaContentChange}
         />
       </box>
-      <box paddingLeft={2}>
+      <box flexDirection="row" gap={1} paddingLeft={2}>
+        <text fg={colors.dimSeparator}>tab to switch mode</text>
+        <text fg={colors.dimSeparator}>·</text>
         <text fg={colors.dimSeparator}>ctrl+c to quit</text>
       </box>
     </box>

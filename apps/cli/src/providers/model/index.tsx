@@ -7,6 +7,7 @@ import {
   type ReasoningLevel,
   type SupportedChatModel,
 } from "@cattiva/shared";
+import { Mode } from "@cattiva/database/enums";
 
 const [FIRST_MODEL] = SUPPORTED_CHAT_MODELS;
 
@@ -14,9 +15,12 @@ const DEFAULT_MODEL: SupportedChatModel =
   SUPPORTED_CHAT_MODELS.find((model) => model.id === DEFAULT_CHAT_MODEL_ID) ?? FIRST_MODEL;
 
 type ModelContextValue = {
+  mode: Mode;
   model: SupportedChatModel;
   reasoning: ReasoningLevel;
+  setMode: (mode: Mode) => void;
   setModel: (model: SupportedChatModel) => void;
+  toggleMode: () => void;
   setReasoning: (reasoning: ReasoningLevel) => void;
 };
 
@@ -38,17 +42,22 @@ type ModelProviderProps = {
 export function ModelProvider({ children }: ModelProviderProps) {
   const [model, setModelState] = useState<SupportedChatModel>(DEFAULT_MODEL);
   const [reasoning, setReasoningState] = useState<ReasoningLevel>(DEFAULT_MODEL.defaultReasoning);
+  const [mode, setMode] = useState<Mode>(Mode.BUILD);
 
   const setModel = useCallback((next: SupportedChatModel) => {
     setModelState(next);
     setReasoningState((current) => clampReasoningLevel(next, current));
   }, []);
 
+  const toggleMode = useCallback(() => {
+    setMode((current) => (current === Mode.BUILD ? Mode.PLAN : Mode.BUILD));
+  }, []);
+
   const setReasoning = setReasoningState;
 
   const value = useMemo(
-    () => ({ model, reasoning, setModel, setReasoning }),
-    [model, reasoning, setModel, setReasoning],
+    () => ({ model, reasoning, mode, setMode, toggleMode, setModel, setReasoning }),
+    [mode, model, reasoning, setModel, setReasoning, toggleMode],
   );
 
   return <ModelContext.Provider value={value}>{children}</ModelContext.Provider>;
