@@ -1,0 +1,199 @@
+[
+  {
+    "id": "dropCheckConstraint.message.message_reasoning_check_448ac843",
+    "label": "Drop check constraint \"message_reasoning_check_448ac843\" on \"message\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "message_reasoning_check_448ac843",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"message_reasoning_check_448ac843\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_reasoning_check_448ac843",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"message_reasoning_check_448ac843\"",
+        "sql": "ALTER TABLE \"public\".\"message\" DROP CONSTRAINT \"message_reasoning_check_448ac843\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"message_reasoning_check_448ac843\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_reasoning_check_448ac843",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.message.effort",
+    "label": "Add column \"effort\" to \"message\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "effort",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"effort\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "effort"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"effort\"",
+        "sql": "ALTER TABLE \"public\".\"message\" ADD COLUMN \"effort\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"effort\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "effort"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.message.message_effort_check_071ddbf9",
+    "label": "Add check constraint \"message_effort_check_071ddbf9\" on \"message\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "message_effort_check_071ddbf9",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"message_effort_check_071ddbf9\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_effort_check_071ddbf9",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"message_effort_check_071ddbf9\"",
+        "sql": "ALTER TABLE \"public\".\"message\" ADD CONSTRAINT \"message_effort_check_071ddbf9\" CHECK (\"effort\" IN ('low', 'medium', 'high', 'xhigh', 'max'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"message_effort_check_071ddbf9\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_effort_check_071ddbf9",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data_migration.split legacy reasoning into reasoning + effort",
+    "label": "Data transform: split legacy reasoning into reasoning + effort",
+    "operationClass": "data",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "Check split legacy reasoning into reasoning + effort has work to do",
+        "sql": "SELECT EXISTS (SELECT \"id\" FROM \"public\".\"message\" WHERE \"reasoning\" IN ('low', 'medium', 'high') LIMIT 1) AS ok",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "Run split legacy reasoning into reasoning + effort",
+        "sql": "UPDATE \"public\".\"message\" SET \"effort\" = \"reasoning\", \"reasoning\" = 'on' WHERE \"reasoning\" IN ('low', 'medium', 'high')",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "Verify split legacy reasoning into reasoning + effort resolved all violations",
+        "sql": "SELECT NOT EXISTS (SELECT \"id\" FROM \"public\".\"message\" WHERE \"reasoning\" IN ('low', 'medium', 'high') LIMIT 1) AS ok",
+        "params": []
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.message.message_reasoning_check_350861bd",
+    "label": "Add check constraint \"message_reasoning_check_350861bd\" on \"message\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "checkConstraint",
+        "name": "message_reasoning_check_350861bd",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"message_reasoning_check_350861bd\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_reasoning_check_350861bd",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"message_reasoning_check_350861bd\"",
+        "sql": "ALTER TABLE \"public\".\"message\" ADD CONSTRAINT \"message_reasoning_check_350861bd\" CHECK (\"reasoning\" IN ('on', 'off'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"message_reasoning_check_350861bd\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "message_reasoning_check_350861bd",
+          "public",
+          "\"public\".\"message\""
+        ]
+      }
+    ]
+  }
+]

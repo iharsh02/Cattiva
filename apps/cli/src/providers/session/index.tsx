@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { ChatStreamEvent } from "@cattiva/shared";
 import { resumeChatTurn, streamChatTurn } from "@/lib/chat";
+import { thinkingFromParts } from "@/lib/parts";
 import { createSession, fetchSession } from "@/lib/sessions";
 import { useModel } from "@/providers/model";
 
@@ -18,12 +19,14 @@ export type ChatMessage = {
   role: string;
   content: string;
   model: string;
+  thinking?: string;
 };
 
 export type SessionContextValue = {
   sessionId: string | null;
   messages: ChatMessage[];
   reply: string | null;
+  thinking: string | null;
   busy: boolean;
   error: string | null;
   send: (text: string) => void;
@@ -47,19 +50,8 @@ function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-/** Ids the server has never seen; only a locally committed partial carries one. */
 const LOCAL_ID_PREFIX = "local-";
 
-/**
- * Drops the trailing half-reply a failed turn left behind. The rule stands on its own —
- * a locally-invented assistant message is one the server never acknowledged, and a resume
- * always answers afresh rather than continuing it, so it can never become part of the
- * transcript. It is not a copy of the server's own discard rule, which works off row status
- * that the client cannot see.
- *
- * Without this the abandoned text sits on screen above its own replacement and reads as the
- * model having answered twice.
- */
 function withoutAbandonedReply(messages: ChatMessage[]): ChatMessage[] {
   let end = messages.length;
 
@@ -73,11 +65,12 @@ function withoutAbandonedReply(messages: ChatMessage[]): ChatMessage[] {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { mode, model, reasoning } = useModel();
+  const { mode, model, reasoning, effort } = useModel();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reply, setReply] = useState<string | null>(null);
+  const [thinking, setThinking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,14 +88,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     busyRef.current = false;
     setBusy(false);
     setReply(null);
+    setThinking(null);
   }, []);
 
-  /**
-   * Runs one exclusive piece of session work. The `owns` it hands the caller goes false the
-   * moment the conversation is cleared or switched underneath it, so a late reply cannot
-   * write into whatever is on screen now; busy is claimed for the run and released only by a
-   * run that still owns the view.
-   */
   const runOwned = useCallback(<T,>(work: (owns: () => boolean) => Promise<T>): Promise<T> => {
     const generation = generationRef.current;
     const owns = () => generationRef.current === generation;
@@ -118,6 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           busyRef.current = false;
           setBusy(false);
           setReply(null);
+          setThinking(null);
         }
       }
     })();
@@ -130,11 +119,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return `local-${localIdRef.current}-${suffix}`;
   }, []);
 
-  /**
-   * Draws one turn, whatever opened it. Sending and resuming differ only in how the stream
-   * starts, so everything after that — the growing reply, the commit, aborting — lives here
-   * once. Answers whether the stream produced anything at all.
-   */
   const runTurn = useCallback(
     async (
       open: (signal: AbortSignal) => AsyncGenerator<ChatStreamEvent>,
@@ -144,19 +128,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       abortRef.current = controller;
 
       let assistant = "";
+      let thought = "";
       let streamed = false;
 
       const commit = (messageId: string) => {
-        if (assistant.length === 0 || !owns()) return;
+        if ((assistant.length === 0 && thought.length === 0) || !owns()) return;
 
         setMessages((current) => [
           ...current,
-          { id: messageId, role: "ASSISTANT", content: assistant, model: model.id },
+          {
+            id: messageId,
+            role: "ASSISTANT",
+            content: assistant,
+            model: model.id,
+            thinking: thought.length > 0 ? thought : undefined,
+          },
         ]);
       };
 
       try {
-        if (owns()) setReply("");
+        if (owns()) {
+          setReply("");
+          setThinking(null);
+        }
 
         for await (const event of open(controller.signal)) {
           if (!owns()) return streamed;
@@ -168,19 +162,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               setReply(assistant);
               break;
 
+            case "reasoning-delta":
+              thought += event.text;
+              setThinking(thought);
+              break;
+
             case "done":
               commit(event.messageId);
               setReply(null);
+              setThinking(null);
               break;
 
             case "error":
               // Whatever arrived before the failure is kept, as the server keeps it.
               commit(localId("partial"));
               setReply(null);
+              setThinking(null);
               setError(event.message);
               break;
 
-            // Reasoning and tool calls stream, but nothing renders them yet.
+            // Tool calls stream, but nothing renders them yet.
             default:
               break;
           }
@@ -230,13 +231,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               mode,
               model: model.id,
               reasoning,
+              effort,
               signal,
             }),
           owns,
         );
       });
     },
-    [localId, mode, model.id, reasoning, runOwned, runTurn],
+    [localId, mode, model.id, reasoning, effort, runOwned, runTurn],
   );
 
   const resume = useCallback(async (): Promise<boolean> => {
@@ -275,7 +277,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const data = await fetchSession(id);
           if (!owns()) return;
 
-          setMessages(data.messages);
+          setMessages(
+            data.messages.map((message): ChatMessage => ({
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              model: message.model,
+              thinking: thinkingFromParts(message.parts),
+            })),
+          );
         } catch (err) {
           if (owns()) setError(errorText(err, "Failed to load session"));
         }
@@ -285,8 +295,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ sessionId, messages, reply, busy, error, send, resume, reset, load }),
-    [sessionId, messages, reply, busy, error, send, resume, reset, load],
+    () => ({ sessionId, messages, reply, thinking, busy, error, send, resume, reset, load }),
+    [sessionId, messages, reply, thinking, busy, error, send, resume, reset, load],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

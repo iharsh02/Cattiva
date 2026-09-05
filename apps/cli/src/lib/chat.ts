@@ -1,7 +1,8 @@
 import {
   chatStreamEventSchema,
   type ChatStreamEvent,
-  type ReasoningLevel,
+  type Effort,
+  type Reasoning,
   type SupportedChatModelId,
 } from "@cattiva/shared";
 import type { Mode } from "@cattiva/database/enums";
@@ -61,7 +62,8 @@ export type ChatTurnRequest = {
   content: string;
   mode: Mode;
   model: SupportedChatModelId;
-  reasoning: ReasoningLevel;
+  reasoning: Reasoning;
+  effort: Effort | null;
   signal?: AbortSignal;
 };
 
@@ -71,12 +73,13 @@ export async function* streamChatTurn({
   mode,
   model,
   reasoning,
+  effort,
   signal,
 }: ChatTurnRequest): AsyncGenerator<ChatStreamEvent> {
   const res = await apiClient.chat[":id"].$post(
     {
       param: { id: sessionId },
-      json: { content, mode, model, reasoning },
+      json: { content, mode, model, reasoning, ...(effort === null ? {} : { effort }) },
     },
     { init: { signal } },
   );

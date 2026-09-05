@@ -13,7 +13,11 @@ const enums = buildNamespacedNativeEnums(
 export const Role = enums.public.Role.members;
 export const Mode = enums.public.Mode.members;
 export const MessageStatus = enums.public.MessageStatus.members;
+export const Reasoning = enums.public.Reasoning.members;
+export const Effort = enums.public.Effort.members;
 
 export type Role = typeof enums.public.Role.Value;
 export type Mode = typeof enums.public.Mode.Value;
 export type MessageStatus = typeof enums.public.MessageStatus.Value;
+export type Reasoning = typeof enums.public.Reasoning.Value;
+export type Effort = typeof enums.public.Effort.Value;

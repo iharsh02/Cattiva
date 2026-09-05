@@ -2,6 +2,7 @@ import { SessionPicker } from "@/components/dialogs/session-picker";
 import { ThemePicker } from "@/components/dialogs/theme-picker";
 import { ModelPicker } from "@/components/dialogs/model-picker";
 import { ReasoningPicker } from "@/components/dialogs/reasoning-picker";
+import { EffortPicker } from "@/components/dialogs/effort-picker";
 import type { Command } from "@/types/commandMenu";
 import { AgentModePicker } from "../dialogs/agent-mode";
 
@@ -65,12 +66,23 @@ export const COMMANDS: Command[] = [
   },
   {
     name: "reasoning",
-    description: "Set how many thinking tokens the model may spend",
+    description: "Turn the model's internal thinking on or off",
     value: "/reasoning",
     action: (ctx) => {
       ctx.dialog.open({
-        title: "Reasoning Effort",
+        title: "Reasoning",
         children: <ReasoningPicker />,
+      });
+    },
+  },
+  {
+    name: "effort",
+    description: "Set how hard the model works the turn",
+    value: "/effort",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Execution Effort",
+        children: <EffortPicker />,
       });
     },
   },

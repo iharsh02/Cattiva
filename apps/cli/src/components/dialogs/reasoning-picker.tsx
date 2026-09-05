@@ -1,33 +1,40 @@
 import { useCallback } from "react";
-import { REASONING_TOKEN_BUDGETS, type ReasoningLevel } from "@cattiva/shared";
+import { allowsReasoningOff, type Reasoning } from "@cattiva/shared";
 import { useDialog } from "@/providers/dialog";
 import { useModel } from "@/providers/model";
 import { useTheme } from "@/providers/theme";
 import { useToast } from "@/providers/toast";
 import { SearchList } from "./search-list";
 
-const DESCRIPTIONS: Record<ReasoningLevel, string> = {
-  off: "answer straight away, no thinking tokens",
-  low: `think briefly · up to ${REASONING_TOKEN_BUDGETS.low} tokens`,
-  medium: `think it through · up to ${REASONING_TOKEN_BUDGETS.medium} tokens`,
-  high: `think hard · up to ${REASONING_TOKEN_BUDGETS.high} tokens`,
+const DESCRIPTIONS: Record<Reasoning, string> = {
+  on: "think it through before answering",
+  off: "answer straight away, without thinking first",
 };
 
 export function ReasoningPicker() {
   const { colors } = useTheme();
   const { close } = useDialog();
-  const { model, reasoning, setReasoning } = useModel();
+  const { model, reasoning, effort, setReasoning } = useModel();
   const toast = useToast();
 
-  const levels: ReasoningLevel[] = [...model.reasoning];
+  const levels: Reasoning[] = [...model.reasoning];
 
   const select = useCallback(
-    (next: ReasoningLevel) => {
+    (next: Reasoning) => {
       setReasoning(next);
       close();
-      toast.show({ variant: "success", message: `Reasoning set to ${next}` });
+
+      // The resolver may lower effort to keep the pair legal, so say so rather than letting the
+      // status bar quietly disagree with what was just chosen.
+      const lowered = next === "off" && !allowsReasoningOff(model, effort);
+      toast.show({
+        variant: "success",
+        message: lowered
+          ? `Reasoning off · effort lowered to high, which ${model.id} requires to answer unthinking`
+          : `Reasoning ${next}`,
+      });
     },
-    [setReasoning, close, toast],
+    [setReasoning, close, toast, model, effort],
   );
 
   if (levels.length === 0) {
@@ -43,31 +50,27 @@ export function ReasoningPicker() {
       initialIndex={initialIndex}
       filterFn={(level, query) => level.includes(query.toLowerCase())}
       onSelect={select}
-      placeholder="Search levels"
-      emptyText="No levels match"
-      renderItem={(level, isSelected) => {
-        const dots =
-          level === "off" ? "○○○" : level === "low" ? "●○○" : level === "medium" ? "●●○" : "●●●";
-        return (
-          <>
-            <text
-              selectable={false}
-              fg={
-                isSelected
-                  ? colors.selection
-                  : level === "off"
-                    ? colors.dimSeparator
-                    : colors.thinking
-              }
-            >
-              {`${dots} ${level}`}
-            </text>
-            <text selectable={false} fg={colors.dimSeparator}>
-              {` · ${DESCRIPTIONS[level]}`}
-            </text>
-          </>
-        );
-      }}
+      placeholder="Search"
+      emptyText="No match"
+      renderItem={(level, isSelected) => (
+        <>
+          <text
+            selectable={false}
+            fg={
+              isSelected
+                ? colors.selection
+                : level === "off"
+                  ? colors.dimSeparator
+                  : colors.thinking
+            }
+          >
+            {`${level === "on" ? "◉" : "○"} ${level}`}
+          </text>
+          <text selectable={false} fg={colors.dimSeparator}>
+            {` · ${DESCRIPTIONS[level]}`}
+          </text>
+        </>
+      )}
     />
   );
 }

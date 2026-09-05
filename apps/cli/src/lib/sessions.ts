@@ -16,6 +16,13 @@ export async function createSession() {
 
   return res.json();
 }
+export type StoredSessionMessage = {
+  id: string;
+  role: string;
+  content: string;
+  model: string;
+  parts: unknown;
+};
 
 export async function fetchSession(id: string) {
   const res = await apiClient.sessions[":id"].$get({ param: { id } });
@@ -24,5 +31,8 @@ export async function fetchSession(id: string) {
     throw new Error(await getErrormessage(res));
   }
 
-  return res.json();
+  const session = await res.json();
+  const messages: readonly StoredSessionMessage[] = session.messages;
+
+  return { ...session, messages };
 }

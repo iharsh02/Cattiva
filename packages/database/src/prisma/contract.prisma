@@ -15,10 +15,16 @@ enum MessageStatus {
 }
 
 enum Reasoning {
+  on
   off
+}
+
+enum Effort {
   low
   medium
   high
+  xhigh
+  max
 }
 
 model Session {
@@ -44,6 +50,7 @@ model Message {
   parts     Jsonb?
   mode      Mode
   reasoning Reasoning?
+  effort    Effort?
   duration  Int?
   createdAt temporal.createdAtString()
 

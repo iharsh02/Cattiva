@@ -2,7 +2,6 @@
 
 A terminal agent shell
 
-
 | Part                       | Package            | What it is                                                                     |
 | -------------------------- | ------------------ | ------------------------------------------------------------------------------ |
 | [`apps/cli`](apps/cli)     | `@cattiva/cli`     | A terminal chat UI with persistent, resumable sessions. Early, in development  |
@@ -21,13 +20,14 @@ A single-window terminal chat: you type, the reply streams in below it, and the 
 stays in the same view. Sessions are written to Postgres, so you can close the CLI and pick a
 conversation back up later.
 
-**What works today:** streaming replies, session persistence and resume, switching model and
-reasoning effort mid-session, 32 themes.
+**What works today:** streaming replies, session persistence and resume, the model's thinking
+shown as it happens and kept with the transcript, switching model, reasoning and effort
+mid-session, 32 themes.
 
 **What does not, yet:** the model has no tools — it cannot read or edit files, run commands,
 or take any action. This is a chat shell with good session handling, not yet a coding agent.
-Reasoning and tool-call events already stream from the server but nothing renders them, and
-the `BUILD`/`PLAN` mode in the schema is unused.
+Tool-call events already stream from the server but nothing renders them, and the `BUILD`/`PLAN`
+mode in the schema is unused.
 
 ### Setup
 
@@ -54,14 +54,18 @@ bun run cli:start             # the terminal UI
 Type `/` in the prompt to open the menu. Every command in it works — one that does nothing
 yet is a broken feature, not a missing one, so it is not listed.
 
-| Command      | What it does                                     |
-| ------------ | ------------------------------------------------ |
-| `/new`       | Clear the conversation and start fresh           |
-| `/session`   | Switch to a saved session, loaded in place       |
-| `/model`     | Choose the model this session runs against       |
-| `/reasoning` | Set how many thinking tokens the model may spend |
-| `/theme`     | Switch the colour theme                          |
-| `/exit`      | Quit                                             |
+| Command      | What it does                                 |
+| ------------ | -------------------------------------------- |
+| `/new`       | Clear the conversation and start fresh       |
+| `/session`   | Switch to a saved session, loaded in place   |
+| `/model`     | Choose the model this session runs against   |
+| `/reasoning` | Turn the model's internal thinking on or off |
+| `/effort`    | Set how hard the model works the turn        |
+| `/theme`     | Switch the colour theme                      |
+| `/exit`      | Quit                                         |
+
+`ctrl+r` opens up the thinking behind every reply in the transcript, and closes it again.
+While a reply is still being thought about, the thinking shows itself.
 
 ### Models
 
@@ -72,10 +76,18 @@ yet is a broken feature, not a missing one, so it is not listed.
 | `claude-opus-4-6`   | Anthropic | `ANTHROPIC_API_KEY`            |
 | `claude-opus-5`     | Anthropic | `ANTHROPIC_API_KEY`            |
 
-Each declares which reasoning levels it offers — `off`, `low`, `medium`, `high` — and which
-it defaults to. `/reasoning` maps the level onto the provider's own control: Anthropic's
-thinking budget, Gemini's `thinkingConfig`. Turning it off removes the several seconds a
-thinking model spends before its first word.
+Two separate settings, because the providers treat them separately:
+
+- **Reasoning** (`on` / `off`) is whether the model thinks internally before it answers.
+  Turning it off removes the several seconds a thinking model spends before its first word.
+- **Effort** (`low`, `medium`, `high`, `xhigh`, `max`) is how hard it works the turn —
+  thoroughness, how much it says, and, once there are tools, how many calls it makes.
+
+Each model declares which of these it actually offers, and only those appear — a setting the
+provider does not have is not invented for it. `xhigh` arrived with Opus 4.7, so the 4.6-era
+models do not list it; Google has no effort parameter of any kind, so on Gemini there is no
+effort control at all and `/effort` says so. Where both exist they are resolved together, since
+Opus 5 refuses to answer without thinking above `high` effort.
 
 Replies are re-cut into words before they leave the server. Providers hand back whole
 sentences at a time — Gemini answers a short question in about five chunks — which arrives as

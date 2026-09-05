@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  clampReasoningLevel,
   DEFAULT_CHAT_MODEL_ID,
+  resolveTurnSettings,
   SUPPORTED_CHAT_MODELS,
-  type ReasoningLevel,
+  type Effort,
+  type Reasoning,
   type SupportedChatModel,
 } from "@cattiva/shared";
 import { Mode } from "@cattiva/database/enums";
@@ -17,11 +18,13 @@ const DEFAULT_MODEL: SupportedChatModel =
 type ModelContextValue = {
   mode: Mode;
   model: SupportedChatModel;
-  reasoning: ReasoningLevel;
+  reasoning: Reasoning;
+  effort: Effort | null;
   setMode: (mode: Mode) => void;
   setModel: (model: SupportedChatModel) => void;
   toggleMode: () => void;
-  setReasoning: (reasoning: ReasoningLevel) => void;
+  setReasoning: (reasoning: Reasoning) => void;
+  setEffort: (effort: Effort) => void;
 };
 
 const ModelContext = createContext<ModelContextValue | null>(null);
@@ -41,23 +44,45 @@ type ModelProviderProps = {
 
 export function ModelProvider({ children }: ModelProviderProps) {
   const [model, setModelState] = useState<SupportedChatModel>(DEFAULT_MODEL);
-  const [reasoning, setReasoningState] = useState<ReasoningLevel>(DEFAULT_MODEL.defaultReasoning);
+  const [settings, setSettings] = useState(() => resolveTurnSettings(DEFAULT_MODEL, {}));
   const [mode, setMode] = useState<Mode>(Mode.BUILD);
 
   const setModel = useCallback((next: SupportedChatModel) => {
     setModelState(next);
-    setReasoningState((current) => clampReasoningLevel(next, current));
+    setSettings((current) => resolveTurnSettings(next, current));
   }, []);
+
+  const setReasoning = useCallback(
+    (reasoning: Reasoning) => {
+      setSettings((current) => resolveTurnSettings(model, { ...current, reasoning }));
+    },
+    [model],
+  );
+
+  const setEffort = useCallback(
+    (effort: Effort) => {
+      setSettings((current) => resolveTurnSettings(model, { ...current, effort }));
+    },
+    [model],
+  );
 
   const toggleMode = useCallback(() => {
     setMode((current) => (current === Mode.BUILD ? Mode.PLAN : Mode.BUILD));
   }, []);
 
-  const setReasoning = setReasoningState;
-
   const value = useMemo(
-    () => ({ model, reasoning, mode, setMode, toggleMode, setModel, setReasoning }),
-    [mode, model, reasoning, setModel, setReasoning, toggleMode],
+    () => ({
+      model,
+      reasoning: settings.reasoning,
+      effort: settings.effort,
+      mode,
+      setMode,
+      toggleMode,
+      setModel,
+      setReasoning,
+      setEffort,
+    }),
+    [mode, model, settings, setModel, setReasoning, setEffort, toggleMode],
   );
 
   return <ModelContext.Provider value={value}>{children}</ModelContext.Provider>;

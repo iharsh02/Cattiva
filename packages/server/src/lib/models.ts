@@ -2,15 +2,15 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 
 import {
-  clampReasoningLevel,
   findSupportedChatModel,
-  REASONING_ANSWER_HEADROOM_TOKENS,
-  REASONING_TOKEN_BUDGETS,
-  type ReasoningLevel,
+  MAX_OUTPUT_TOKENS,
+  resolveTurnSettings,
+  type Effort,
+  type Reasoning,
   type SupportedChatModel,
   type SupportedChatModelId,
   type SupportedProvider,
-  type ThinkingLevel,
+  type TurnSettings,
 } from "@cattiva/shared";
 import type { LanguageModel, ModelMessage } from "ai";
 
@@ -19,66 +19,71 @@ type ProviderOptions = NonNullable<Extract<ModelMessage, { role: "system" }>["pr
 type AnthropicModelId = Extract<SupportedChatModel, { provider: "anthropic" }>["id"];
 type GoogleModelId = Extract<SupportedChatModel, { provider: "google" }>["id"];
 
+const GOOGLE_THINKING_BUDGET = 8192;
+
 export type ResolvedModel = {
   model: LanguageModel;
   provider: SupportedProvider;
   modelId: SupportedChatModelId;
-  reasoning: ReasoningLevel;
+  reasoning: Reasoning;
+  effort: Effort | null;
   providerOptions: ProviderOptions;
-  maxOutputTokens: number | undefined;
+  maxOutputTokens: number;
 };
 
 function assertUnsupportedProvider(provider: string): never {
   throw new Error(`Unsupported provider: ${provider}`);
 }
 
-function thinkingBudget(level: ThinkingLevel): number {
-  return REASONING_TOKEN_BUDGETS[level];
-}
-
-function anthropicThinking(reasoning: ReasoningLevel): ProviderOptions {
-  if (reasoning === "off") {
-    return { anthropic: { thinking: { type: "disabled" } } };
-  }
-
+function anthropicOptions({ reasoning, effort }: TurnSettings): ProviderOptions {
   return {
-    anthropic: { thinking: { type: "enabled", budgetTokens: thinkingBudget(reasoning) } },
+    anthropic: {
+      thinking:
+        reasoning === "on" ? { type: "adaptive", display: "summarized" } : { type: "disabled" },
+      ...(effort === null ? {} : { effort }),
+    },
   };
 }
 
-function googleThinking(reasoning: ReasoningLevel): ProviderOptions {
-  const budget = reasoning === "off" ? 0 : thinkingBudget(reasoning);
+function googleOptions({ reasoning }: TurnSettings): ProviderOptions {
+  if (reasoning === "off") {
+    return { google: { thinkingConfig: { thinkingBudget: 0, includeThoughts: false } } };
+  }
 
-  return { google: { thinkingConfig: { thinkingBudget: budget } } };
+  return {
+    google: {
+      thinkingConfig: { thinkingBudget: GOOGLE_THINKING_BUDGET, includeThoughts: true },
+    },
+  };
 }
 
 function resolveSupportedChatModel(
   model: SupportedChatModel,
-  reasoning: ReasoningLevel,
+  settings: TurnSettings,
 ): ResolvedModel {
   const provider = model.provider;
-
-  const maxOutputTokens =
-    reasoning === "off" ? undefined : thinkingBudget(reasoning) + REASONING_ANSWER_HEADROOM_TOKENS;
+  const common = {
+    provider,
+    modelId: model.id,
+    reasoning: settings.reasoning,
+    effort: settings.effort,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+  } as const;
 
   switch (provider) {
     case "anthropic":
       return {
-        model: anthropic(model.id as AnthropicModelId),
+        ...common,
         provider,
-        modelId: model.id,
-        reasoning,
-        providerOptions: anthropicThinking(reasoning),
-        maxOutputTokens,
+        model: anthropic(model.id as AnthropicModelId),
+        providerOptions: anthropicOptions(settings),
       };
     case "google":
       return {
-        model: google(model.id as GoogleModelId),
+        ...common,
         provider,
-        modelId: model.id,
-        reasoning,
-        providerOptions: googleThinking(reasoning),
-        maxOutputTokens,
+        model: google(model.id as GoogleModelId),
+        providerOptions: googleOptions(settings),
       };
     default:
       return assertUnsupportedProvider(provider);
@@ -89,16 +94,16 @@ export function isSupportedChatModelId(modelId: string): modelId is SupportedCha
   return findSupportedChatModel(modelId) !== undefined;
 }
 
-/** An omitted level defers to the model's own declared default: one default, one source. */
-export function resolveChatModel(modelId: string, reasoning?: ReasoningLevel): ResolvedModel {
+/** An omitted setting defers to the model's own declared default: one default, one source. */
+export function resolveChatModel(
+  modelId: string,
+  requested: Partial<TurnSettings> = {},
+): ResolvedModel {
   const model = findSupportedChatModel(modelId);
 
   if (!model) {
     throw new Error(`Unsupported modelId: ${modelId}`);
   }
 
-  return resolveSupportedChatModel(
-    model,
-    clampReasoningLevel(model, reasoning ?? model.defaultReasoning),
-  );
+  return resolveSupportedChatModel(model, resolveTurnSettings(model, requested));
 }

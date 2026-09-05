@@ -8,6 +8,7 @@ import type { Command } from "@/types/commandMenu";
 import { useToast } from "@/providers/toast";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 import { useDialog } from "@/providers/dialog";
+import { effortDots } from "@/components/dialogs/effort-picker";
 import { useSession } from "@/providers/session";
 import { useModel } from "@/providers/model";
 
@@ -22,7 +23,7 @@ export function InputBar() {
   const textareaRef = useRef<TextareaRenderable>(null);
   const onSubmitRef = useRef<() => void>(() => {});
   const renderer = useRenderer();
-  const { mode, reasoning, toggleMode, setMode, setModel } = useModel();
+  const { mode, reasoning, effort, toggleMode, setMode, setModel } = useModel();
   const {
     showCommandMenu,
     commandQuery,
@@ -162,14 +163,14 @@ export function InputBar() {
         <text fg={mode === "BUILD" ? colors.primary : colors.planMode}>{mode}</text>
         <text fg={colors.dimSeparator}>·</text>
         <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
-          {reasoning === "off"
-            ? "○○○ off"
-            : reasoning === "low"
-              ? "●○○ low"
-              : reasoning === "medium"
-                ? "●●○ med"
-                : "●●● high"}
+          {reasoning === "on" ? "◉ thinking" : "○ no thinking"}
         </text>
+        {effort === null ? null : (
+          <>
+            <text fg={colors.dimSeparator}>·</text>
+            <text fg={colors.primary}>{`${effortDots(effort)} ${effort}`}</text>
+          </>
+        )}
       </box>
       <box
         flexDirection="row"
@@ -191,6 +192,8 @@ export function InputBar() {
       </box>
       <box flexDirection="row" gap={1} paddingLeft={2}>
         <text fg={colors.dimSeparator}>tab to switch mode</text>
+        <text fg={colors.dimSeparator}>·</text>
+        <text fg={colors.dimSeparator}>ctrl+r for thinking</text>
         <text fg={colors.dimSeparator}>·</text>
         <text fg={colors.dimSeparator}>ctrl+c to quit</text>
       </box>

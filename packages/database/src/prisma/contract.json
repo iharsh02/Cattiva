@@ -17,6 +17,31 @@
     "namespaces": {
       "public": {
         "enum": {
+          "Effort": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "low",
+                "value": "low"
+              },
+              {
+                "name": "medium",
+                "value": "medium"
+              },
+              {
+                "name": "high",
+                "value": "high"
+              },
+              {
+                "name": "xhigh",
+                "value": "xhigh"
+              },
+              {
+                "name": "max",
+                "value": "max"
+              }
+            ]
+          },
           "MessageStatus": {
             "codecId": "pg/text@1",
             "members": [
@@ -47,20 +72,12 @@
             "codecId": "pg/text@1",
             "members": [
               {
+                "name": "on",
+                "value": "on"
+              },
+              {
                 "name": "off",
                 "value": "off"
-              },
-              {
-                "name": "low",
-                "value": "low"
-              },
-              {
-                "name": "medium",
-                "value": "medium"
-              },
-              {
-                "name": "high",
-                "value": "high"
               }
             ]
           },
@@ -104,6 +121,19 @@
                 "type": {
                   "codecId": "pg/int4@1",
                   "kind": "scalar"
+                }
+              },
+              "effort": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Effort",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "id": {
@@ -214,6 +244,9 @@
                 },
                 "duration": {
                   "column": "duration"
+                },
+                "effort": {
+                  "column": "effort"
                 },
                 "id": {
                   "column": "id"
@@ -343,13 +376,18 @@
             "message": {
               "checks": [
                 {
+                  "expression": "\"effort\" IN ('low', 'medium', 'high', 'xhigh', 'max')",
+                  "name": "message_effort_check_071ddbf9",
+                  "prefix": "message_effort_check"
+                },
+                {
                   "expression": "\"mode\" IN ('BUILD', 'PLAN')",
                   "name": "message_mode_check_c62a9c9d",
                   "prefix": "message_mode_check"
                 },
                 {
-                  "expression": "\"reasoning\" IN ('off', 'low', 'medium', 'high')",
-                  "name": "message_reasoning_check_448ac843",
+                  "expression": "\"reasoning\" IN ('on', 'off')",
+                  "name": "message_reasoning_check_350861bd",
                   "prefix": "message_reasoning_check"
                 },
                 {
@@ -382,6 +420,17 @@
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
                   "nullable": true
+                },
+                "effort": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Effort",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "id": {
                   "codecId": "pg/text@1",
@@ -541,6 +590,16 @@
             }
           },
           "valueSet": {
+            "Effort": {
+              "kind": "valueSet",
+              "values": [
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
             "MessageStatus": {
               "kind": "valueSet",
               "values": [
@@ -558,10 +617,8 @@
             "Reasoning": {
               "kind": "valueSet",
               "values": [
-                "off",
-                "low",
-                "medium",
-                "high"
+                "on",
+                "off"
               ]
             },
             "Role": {
@@ -578,7 +635,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "4bce35749bb8c752fb2950985b5891d28338369a0110192a5f3add541216000b"
+    "storageHash": "c4d595066dd54a9704091b999f6205c7c6e9982b617cee0b63b03433d2581df1"
   },
   "execution": {
     "executionHash": "f5473ba018a9e3163ec9e5548d03218a384fab8a3a2e88049be735e80b4b7dc5",

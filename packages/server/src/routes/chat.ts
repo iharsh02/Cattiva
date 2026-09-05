@@ -8,12 +8,16 @@ import { db, orm } from "@cattiva/database";
 import { Mode, type MessageStatus, type Role } from "@cattiva/database/enums";
 import {
   DEFAULT_SESSION_TITLE,
-  reasoningLevelSchema,
+  effortSchema,
+  findSupportedChatModel,
+  reasoningSchema,
+  resolveTurnSettings,
   titleFromMessage,
   toolCallArgsSchema,
   type ChatStreamEvent,
+  type Effort,
   type MessagePart,
-  type ReasoningLevel,
+  type Reasoning,
 } from "@cattiva/shared";
 import { isSupportedChatModelId, resolveChatModel, type ResolvedModel } from "../lib/models";
 import { MESSAGE_FIELDS, type StoredMessage } from "../lib/messages";
@@ -23,7 +27,8 @@ const submitSchema = z.object({
   content: z.string().min(1),
   mode: z.enum(Mode),
   model: z.string().refine(isSupportedChatModelId, "Unsupported model"),
-  reasoning: reasoningLevelSchema.optional(),
+  reasoning: reasoningSchema.optional(),
+  effort: effortSchema.optional(),
 });
 
 const submitValidator = zValidator("json", submitSchema, (result, c) => {
@@ -188,7 +193,8 @@ type Turn = {
   sessionId: string;
   mode: Mode;
   model: string;
-  reasoning: ReasoningLevel | undefined;
+  reasoning: Reasoning | null;
+  effort: Effort | null;
   history: ModelMessage[];
 };
 
@@ -198,7 +204,8 @@ function createMessage(input: {
   status: MessageStatus;
   model: string;
   mode: Mode;
-  reasoning: ReasoningLevel | null;
+  reasoning: Reasoning | null;
+  effort: Effort | null;
   content: string;
   parts?: MessagePart[] | null;
   duration?: number;
@@ -207,9 +214,11 @@ function createMessage(input: {
 }
 
 async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promise<void> {
-  const resolved = resolveChatModel(turn.model, turn.reasoning);
+  const resolved = resolveChatModel(turn.model, {
+    reasoning: turn.reasoning ?? undefined,
+    effort: turn.effort,
+  });
   const startedAt = Date.now();
-
   const { content, parts, aborted, failure } = await consumeModelStream(
     resolved,
     turn.history,
@@ -222,6 +231,7 @@ async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promis
     model: resolved.modelId,
     mode: turn.mode,
     reasoning: resolved.reasoning,
+    effort: resolved.effort,
     duration,
   };
 
@@ -319,7 +329,8 @@ const app = new Hono()
           sessionId,
           mode: pending.mode,
           model: pending.model,
-          reasoning: pending.reasoning ?? undefined,
+          reasoning: pending.reasoning,
+          effort: pending.effort,
           history: buildConversationHistory(history),
         },
         stream,
@@ -328,7 +339,9 @@ const app = new Hono()
   })
   .post("/:id", submitValidator, async (c) => {
     const sessionId = c.req.param("id");
-    const { content, mode, model, reasoning } = c.req.valid("json");
+    const { content, mode, model, reasoning, effort } = c.req.valid("json");
+
+    const settings = resolveTurnSettings(findSupportedChatModel(model)!, { reasoning, effort });
 
     const history = await db.transaction(async (tx) => {
       const session = await tx.orm.public.Session.select("id", "title").first({
@@ -343,7 +356,8 @@ const app = new Hono()
         content,
         model,
         mode,
-        reasoning: reasoning ?? null,
+        reasoning: settings.reasoning,
+        effort: settings.effort,
       });
 
       const title = nextTitle(session.title, content);
@@ -367,7 +381,8 @@ const app = new Hono()
           sessionId,
           mode,
           model,
-          reasoning,
+          reasoning: settings.reasoning,
+          effort: settings.effort,
           history: buildConversationHistory(history),
         },
         stream,
