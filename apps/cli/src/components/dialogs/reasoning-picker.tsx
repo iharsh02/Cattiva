@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { allowsReasoningOff, type Reasoning } from "@cattiva/shared";
+import { allowsReasoningOff, hasReasoningControl, type Reasoning } from "@cattiva/shared";
 import { useDialog } from "@/providers/dialog";
 import { useModel } from "@/providers/model";
 import { useTheme } from "@/providers/theme";
@@ -37,11 +37,11 @@ export function ReasoningPicker() {
     [setReasoning, close, toast, model, effort],
   );
 
-  if (levels.length === 0) {
+  if (!hasReasoningControl(model)) {
     return <text fg={colors.dimSeparator}>{`${model.id} has no reasoning control.`}</text>;
   }
 
-  const initialIndex = Math.max(0, levels.indexOf(reasoning));
+  const initialIndex = reasoning === null ? 0 : Math.max(0, levels.indexOf(reasoning));
 
   return (
     <SearchList

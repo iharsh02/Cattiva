@@ -7,6 +7,7 @@ import {
   type Effort,
   type Reasoning,
   type SupportedChatModel,
+  type TurnSettings,
 } from "@cattiva/shared";
 import { Mode } from "@cattiva/database/enums";
 
@@ -18,7 +19,7 @@ const DEFAULT_MODEL: SupportedChatModel =
 type ModelContextValue = {
   mode: Mode;
   model: SupportedChatModel;
-  reasoning: Reasoning;
+  reasoning: Reasoning | null;
   effort: Effort | null;
   setMode: (mode: Mode) => void;
   setModel: (model: SupportedChatModel) => void;
@@ -43,28 +44,20 @@ type ModelProviderProps = {
 };
 
 export function ModelProvider({ children }: ModelProviderProps) {
-  const [model, setModelState] = useState<SupportedChatModel>(DEFAULT_MODEL);
-  const [settings, setSettings] = useState(() => resolveTurnSettings(DEFAULT_MODEL, {}));
+  const [model, setModel] = useState<SupportedChatModel>(DEFAULT_MODEL);
   const [mode, setMode] = useState<Mode>(Mode.BUILD);
 
-  const setModel = useCallback((next: SupportedChatModel) => {
-    setModelState(next);
-    setSettings((current) => resolveTurnSettings(next, current));
+  const [chosen, setChosen] = useState<Partial<TurnSettings>>({});
+
+  const settings = useMemo(() => resolveTurnSettings(model, chosen), [model, chosen]);
+
+  const setReasoning = useCallback((reasoning: Reasoning) => {
+    setChosen((current) => ({ ...current, reasoning }));
   }, []);
 
-  const setReasoning = useCallback(
-    (reasoning: Reasoning) => {
-      setSettings((current) => resolveTurnSettings(model, { ...current, reasoning }));
-    },
-    [model],
-  );
-
-  const setEffort = useCallback(
-    (effort: Effort) => {
-      setSettings((current) => resolveTurnSettings(model, { ...current, effort }));
-    },
-    [model],
-  );
+  const setEffort = useCallback((effort: Effort) => {
+    setChosen((current) => ({ ...current, effort }));
+  }, []);
 
   const toggleMode = useCallback(() => {
     setMode((current) => (current === Mode.BUILD ? Mode.PLAN : Mode.BUILD));

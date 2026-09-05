@@ -31,12 +31,13 @@ mode in the schema is unused.
 
 ### Setup
 
-Requires [Bun](https://bun.com), Docker (for Postgres), and an API key for whichever provider
-you use. Gemini has a [free tier](https://aistudio.google.com/apikey).
+Requires [Bun](https://bun.com), Docker (for Postgres), and an
+[OpenRouter](https://openrouter.ai/keys) key — every model is reached through it, so that is the
+only provider key. The models ending in `:free` cost nothing.
 
 ```bash
 bun install
-cp .env.example .env          # then fill in an API key
+cp .env.example .env          # then fill in OPENROUTER_API_KEY
 docker run --name cattiva-postgres -e POSTGRES_PASSWORD=mysecretpassword \
   -p 5432:5432 -d postgres
 bun db:init                   # create the schema from the contract
@@ -69,12 +70,19 @@ While a reply is still being thought about, the thinking shows itself.
 
 ### Models
 
-| Model               | Provider  | Key                            |
-| ------------------- | --------- | ------------------------------ |
-| `gemini-2.5-flash`  | Google    | `GOOGLE_GENERATIVE_AI_API_KEY` |
-| `claude-sonnet-4-6` | Anthropic | `ANTHROPIC_API_KEY`            |
-| `claude-opus-4-6`   | Anthropic | `ANTHROPIC_API_KEY`            |
-| `claude-opus-5`     | Anthropic | `ANTHROPIC_API_KEY`            |
+Every model is reached through OpenRouter, so one `OPENROUTER_API_KEY` covers all of them.
+
+| Model                                    | Thinking             |
+| ---------------------------------------- | -------------------- |
+| `anthropic/claude-sonnet-4.6`            | effort, up to `max`  |
+| `anthropic/claude-opus-4.6`              | effort, up to `max`  |
+| `anthropic/claude-opus-5`                | effort, up to `max`  |
+| `google/gemini-2.5-flash`                | on/off only          |
+| `google/gemini-3.6-flash`                | effort, up to `high` |
+| `qwen/qwen3-coder-flash`                 | none                 |
+| `nvidia/nemotron-3-super-120b-a12b:free` | effort, free         |
+
+A model that offers no thinking has no reasoning or effort sent for it at all.
 
 Two separate settings, because the providers treat them separately:
 

@@ -162,14 +162,16 @@ export function InputBar() {
       <box flexDirection="row" gap={1} paddingLeft={1}>
         <text fg={mode === "BUILD" ? colors.primary : colors.planMode}>{mode}</text>
         <text fg={colors.dimSeparator}>·</text>
-        <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
-          {reasoning === "on" ? "◉ thinking" : "○ no thinking"}
-        </text>
-        {effort === null ? null : (
+        {reasoning === null ? null : (
           <>
+            <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
+              {reasoning === "on" ? "◉ thinking" : "○ no thinking"}
+            </text>
             <text fg={colors.dimSeparator}>·</text>
-            <text fg={colors.primary}>{`${effortDots(effort)} ${effort}`}</text>
           </>
+        )}
+        {effort === null ? null : (
+          <text fg={colors.primary}>{`${effortDots(effort)} ${effort}`}</text>
         )}
       </box>
       <box

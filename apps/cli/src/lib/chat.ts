@@ -62,7 +62,7 @@ export type ChatTurnRequest = {
   content: string;
   mode: Mode;
   model: SupportedChatModelId;
-  reasoning: Reasoning;
+  reasoning: Reasoning | null;
   effort: Effort | null;
   signal?: AbortSignal;
 };
@@ -79,7 +79,13 @@ export async function* streamChatTurn({
   const res = await apiClient.chat[":id"].$post(
     {
       param: { id: sessionId },
-      json: { content, mode, model, reasoning, ...(effort === null ? {} : { effort }) },
+      json: {
+        content,
+        mode,
+        model,
+        ...(reasoning === null ? {} : { reasoning }),
+        ...(effort === null ? {} : { effort }),
+      },
     },
     { init: { signal } },
   );

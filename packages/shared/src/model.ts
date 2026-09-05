@@ -3,7 +3,7 @@ export type ModelPricing = {
   outputPerMillionTokens: number;
 };
 
-export type SupportedProvider = "anthropic" | "google";
+export type SupportedProvider = "anthropic" | "google" | "nvidia" | "qwen";
 
 export const REASONING = ["on", "off"] as const;
 
@@ -15,14 +15,13 @@ export type Effort = (typeof EFFORT_LEVELS)[number];
 
 export const DEFAULT_EFFORT: Effort = "high";
 
-export const MAX_OUTPUT_TOKENS = 64000;
-
 type SupportedChatModelDefinition = {
   id: string;
   provider: SupportedProvider;
+  maxOutputTokens: number;
   pricing: ModelPricing;
   reasoning: readonly Reasoning[];
-  defaultReasoning: Reasoning;
+  defaultReasoning: Reasoning | null;
   effort: readonly Effort[];
   defaultEffort: Effort | null;
   requiresReasoningForHighEffort?: boolean;
@@ -30,8 +29,9 @@ type SupportedChatModelDefinition = {
 
 export const SUPPORTED_CHAT_MODELS = [
   {
-    id: "claude-sonnet-4-6",
+    id: "anthropic/claude-sonnet-4.6",
     provider: "anthropic",
+    maxOutputTokens: 128000,
     pricing: {
       inputUsdPerMillionTokens: 3,
       outputPerMillionTokens: 15,
@@ -43,8 +43,9 @@ export const SUPPORTED_CHAT_MODELS = [
     requiresReasoningForHighEffort: false,
   },
   {
-    id: "claude-opus-4-6",
+    id: "anthropic/claude-opus-4.6",
     provider: "anthropic",
+    maxOutputTokens: 128000,
     pricing: {
       inputUsdPerMillionTokens: 5,
       outputPerMillionTokens: 25,
@@ -56,8 +57,9 @@ export const SUPPORTED_CHAT_MODELS = [
     requiresReasoningForHighEffort: false,
   },
   {
-    id: "claude-opus-5",
+    id: "anthropic/claude-opus-5",
     provider: "anthropic",
+    maxOutputTokens: 128000,
     pricing: {
       inputUsdPerMillionTokens: 5,
       outputPerMillionTokens: 25,
@@ -69,8 +71,9 @@ export const SUPPORTED_CHAT_MODELS = [
     requiresReasoningForHighEffort: true,
   },
   {
-    id: "gemini-2.5-flash",
+    id: "google/gemini-2.5-flash",
     provider: "google",
+    maxOutputTokens: 65535,
     pricing: {
       inputUsdPerMillionTokens: 0.3,
       outputPerMillionTokens: 2.5,
@@ -79,6 +82,48 @@ export const SUPPORTED_CHAT_MODELS = [
     defaultReasoning: "off",
     effort: [],
     defaultEffort: null,
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "google/gemini-3.6-flash",
+    provider: "google",
+    maxOutputTokens: 65536,
+    pricing: {
+      inputUsdPerMillionTokens: 0.75,
+      outputPerMillionTokens: 3.75,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "on",
+    effort: ["low", "medium", "high"],
+    defaultEffort: "medium",
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "qwen/qwen3-coder-flash",
+    provider: "qwen",
+    maxOutputTokens: 65536,
+    pricing: {
+      inputUsdPerMillionTokens: 0.195,
+      outputPerMillionTokens: 0.975,
+    },
+    reasoning: [],
+    defaultReasoning: null,
+    effort: [],
+    defaultEffort: null,
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "nvidia/nemotron-3-super-120b-a12b:free",
+    provider: "nvidia",
+    maxOutputTokens: 235929,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "on",
+    effort: ["low", "medium"],
+    defaultEffort: "medium",
     requiresReasoningForHighEffort: false,
   },
 ] as const satisfies readonly SupportedChatModelDefinition[];
@@ -90,14 +135,12 @@ export function findSupportedChatModel(modelId: string) {
   return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
 }
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gemini-2.5-flash";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "google/gemini-3.6-flash";
 
-/** The effort levels above `high`, which cost a model its ability to answer without thinking. */
 const EFFORT_ABOVE_HIGH: readonly Effort[] = ["xhigh", "max"];
 
 export type TurnSettings = {
-  reasoning: Reasoning;
-  /** Null on a model whose provider has no effort control — nothing goes on the wire for it. */
+  reasoning: Reasoning | null;
   effort: Effort | null;
 };
 
@@ -105,7 +148,10 @@ export function resolveTurnSettings(
   model: SupportedChatModel,
   requested: Partial<TurnSettings>,
 ): TurnSettings {
-  const reasoning = clampReasoning(model, requested.reasoning ?? model.defaultReasoning);
+  const reasoning = clampReasoning(model, requested.reasoning);
+
+  if (reasoning === null) return { reasoning: null, effort: null };
+
   const effort = clampEffort(model, requested.effort);
 
   if (reasoning === "off" && model.requiresReasoningForHighEffort && isAboveHigh(effort)) {
@@ -115,8 +161,15 @@ export function resolveTurnSettings(
   return { reasoning, effort };
 }
 
-export function clampReasoning(model: SupportedChatModel, reasoning: Reasoning): Reasoning {
-  return model.reasoning.includes(reasoning) ? reasoning : model.defaultReasoning;
+export function clampReasoning(
+  model: SupportedChatModel,
+  reasoning: Reasoning | null | undefined,
+): Reasoning | null {
+  const offered: readonly Reasoning[] = model.reasoning;
+  if (offered.length === 0) return null;
+
+  if (reasoning && offered.includes(reasoning)) return reasoning;
+  return model.defaultReasoning;
 }
 
 export function clampEffort(
@@ -132,6 +185,10 @@ export function clampEffort(
 
 export function hasEffortControl(model: SupportedChatModel): boolean {
   return model.effort.length > 0;
+}
+
+export function hasReasoningControl(model: SupportedChatModel): boolean {
+  return model.reasoning.length > 0;
 }
 
 export function allowsReasoningOff(model: SupportedChatModel, effort: Effort | null): boolean {
