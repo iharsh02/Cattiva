@@ -14,8 +14,8 @@ export const messagePartSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("tool-call"),
-    id: z.string(),
-    name: z.string(),
+    toolCallId: z.string(),
+    toolName: z.string(),
     args: toolCallArgsSchema,
     result: z.string().optional(),
   }),

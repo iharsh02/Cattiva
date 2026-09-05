@@ -1,12 +1,13 @@
-import { messagePartsSchema } from "@cattiva/shared";
+import { messagePartSchema } from "@cattiva/shared";
 
 export function thinkingFromParts(parts: unknown): string | undefined {
-  const parsed = messagePartsSchema.safeParse(parts);
-  if (!parsed.success) return undefined;
+  if (!Array.isArray(parts)) return undefined;
 
-  const text = parsed.data
-    .filter((part) => part.type === "reasoning")
-    .map((part) => part.text)
+  const text = parts
+    .flatMap((part) => {
+      const parsed = messagePartSchema.safeParse(part);
+      return parsed.success && parsed.data.type === "reasoning" ? [parsed.data.text] : [];
+    })
     .join("");
 
   return text.length > 0 ? text : undefined;

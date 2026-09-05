@@ -3,7 +3,13 @@ import { HTTPException } from "hono/http-exception";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { streamText, type ModelMessage } from "ai";
+import {
+  streamText,
+  type ModelMessage,
+  type TextPart,
+  type ToolCallPart,
+  type ToolResultPart,
+} from "ai";
 import { db, orm } from "@cattiva/database";
 import { Mode, type MessageStatus, type Role } from "@cattiva/database/enums";
 import {
@@ -11,6 +17,7 @@ import {
   effortSchema,
   findSupportedChatModel,
   reasoningSchema,
+  messagePartsSchema,
   resolveTurnSettings,
   titleFromMessage,
   toolCallArgsSchema,
@@ -20,7 +27,12 @@ import {
   type Reasoning,
 } from "@cattiva/shared";
 import { isSupportedChatModelId, resolveChatModel, type ResolvedModel } from "../lib/models";
-import { MESSAGE_FIELDS, type StoredMessage } from "../lib/messages";
+import {
+  HISTORY_FIELDS,
+  MESSAGE_FIELDS,
+  type HistoryMessage,
+  type StoredMessage,
+} from "../lib/messages";
 import { SMOOTHING } from "../lib/smoothing";
 
 const submitSchema = z.object({
@@ -41,16 +53,50 @@ function nextTitle(current: string, content: string): string {
   return current === DEFAULT_SESSION_TITLE ? titleFromMessage(content) : current;
 }
 
-function buildConversationHistory(messages: { role: Role; content: string }[]): ModelMessage[] {
-  return messages.flatMap((message) => {
-    if (message.role === "ERROR" || message.content.length === 0) return [];
+function buildConversationHistory(messages: HistoryMessage[]): ModelMessage[] {
+  return messages.flatMap((message): ModelMessage[] => {
+    if (message.role === "ERROR") return [];
 
-    return [
-      {
-        role: message.role === "USER" ? ("user" as const) : ("assistant" as const),
-        content: message.content,
-      },
-    ];
+    if (message.role === "USER") {
+      return message.content.length > 0 ? [{ role: "user", content: message.content }] : [];
+    }
+
+    const parsed = messagePartsSchema.safeParse(message.parts);
+    const content: (TextPart | ToolCallPart)[] = [];
+    const results: ToolResultPart[] = [];
+
+    for (const part of parsed.success ? parsed.data : []) {
+      if (part.type === "text") {
+        if (part.text.length > 0) content.push({ type: "text", text: part.text });
+        continue;
+      }
+
+      if (part.type !== "tool-call" || part.result === undefined) continue;
+
+      content.push({
+        type: "tool-call",
+        toolCallId: part.toolCallId,
+        toolName: part.toolName,
+        input: part.args,
+      });
+      results.push({
+        type: "tool-result",
+        toolCallId: part.toolCallId,
+        toolName: part.toolName,
+        output: { type: "text", value: part.result },
+      });
+    }
+
+    if (content.length === 0) {
+      return message.content.length > 0 ? [{ role: "assistant", content: message.content }] : [];
+    }
+
+    return results.length > 0
+      ? [
+          { role: "assistant", content },
+          { role: "tool", content: results },
+        ]
+      : [{ role: "assistant", content }];
   });
 }
 
@@ -126,8 +172,8 @@ async function consumeModelStream(
 
           parts.push({
             type: "tool-call",
-            id: part.toolCallId,
-            name: part.toolName,
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
             args,
           });
           await sendEvent(stream, {
@@ -213,7 +259,7 @@ function createMessage(input: {
   return orm.Message.select("id").create(input);
 }
 
-async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promise<void> {
+async function runAssistantTurn(turn: Turn, stream: SSEStreamingApi): Promise<void> {
   const resolved = resolveChatModel(turn.model, {
     reasoning: turn.reasoning ?? undefined,
     effort: turn.effort,
@@ -282,112 +328,165 @@ async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promis
   await sendEvent(stream, terminal);
 }
 
+async function streamAssistantReply(turn: Turn, stream: SSEStreamingApi): Promise<void> {
+  try {
+    await runAssistantTurn(turn, stream);
+  } catch (error) {
+    console.error("Assistant turn failed outside its own reporting", error);
+    if (stream.aborted) return;
+
+    await sendEvent(stream, {
+      type: "error",
+      message: "The reply could not be completed.",
+    }).catch(() => {});
+  }
+}
+
+const generating = new Set<string>();
+
+function beginTurn(sessionId: string): void {
+  if (generating.has(sessionId)) {
+    throw new HTTPException(409, { message: "A reply is already streaming for this session" });
+  }
+
+  generating.add(sessionId);
+}
+
 const app = new Hono()
   .post("/:id/resume", async (c) => {
     const sessionId = c.req.param("id");
-    const outcome = await db.transaction(async (tx) => {
-      const session = await tx.orm.public.Session.select("id")
-        .include("messages", (message) =>
-          message.select(...MESSAGE_FIELDS).orderBy((m) => m.createdAt.asc()),
-        )
-        .first({ id: sessionId });
 
-      if (!session) return { kind: "missing" } as const;
+    beginTurn(sessionId);
 
-      const point = findResumePoint(session.messages);
-      if (!point) return { kind: "settled" } as const;
-      if (!isSupportedChatModelId(point.pending.model)) {
-        return { kind: "unsupported", model: point.pending.model } as const;
-      }
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const session = await tx.orm.public.Session.select("id")
+          .include("messages", (message) =>
+            message.select(...MESSAGE_FIELDS).orderBy((m) => m.createdAt.asc()),
+          )
+          .first({ id: sessionId });
 
-      for (const id of point.discard) {
-        await tx.orm.public.Message.where({ id }).delete();
-      }
+        if (!session) return { kind: "missing" } as const;
 
-      return { kind: "ready", point } as const;
-    });
+        const point = findResumePoint(session.messages);
+        if (!point) return { kind: "settled" } as const;
+        if (!isSupportedChatModelId(point.pending.model)) {
+          return { kind: "unsupported", model: point.pending.model } as const;
+        }
 
-    if (outcome.kind === "missing") {
-      throw new HTTPException(404, { message: "Session not found" });
-    }
+        for (const id of point.discard) {
+          await tx.orm.public.Message.where({ id }).delete();
+        }
 
-    if (outcome.kind === "settled") {
-      throw new HTTPException(409, { message: "Session has no unanswered message to resume" });
-    }
-
-    if (outcome.kind === "unsupported") {
-      throw new HTTPException(400, {
-        message: `Session was recorded with unsupported model ${outcome.model}`,
+        return { kind: "ready", point } as const;
       });
+
+      if (outcome.kind === "missing") {
+        throw new HTTPException(404, { message: "Session not found" });
+      }
+
+      if (outcome.kind === "settled") {
+        throw new HTTPException(409, { message: "Session has no unanswered message to resume" });
+      }
+
+      if (outcome.kind === "unsupported") {
+        throw new HTTPException(400, {
+          message: `Session was recorded with unsupported model ${outcome.model}`,
+        });
+      }
+
+      const { pending, history } = outcome.point;
+
+      return streamSSE(c, async (stream) => {
+        try {
+          await streamAssistantReply(
+            {
+              sessionId,
+              mode: pending.mode,
+              model: pending.model,
+              reasoning: pending.reasoning,
+              effort: pending.effort,
+              history: buildConversationHistory(history),
+            },
+            stream,
+          );
+        } finally {
+          generating.delete(sessionId);
+        }
+      });
+    } catch (error) {
+      // The stream never opened, so nothing downstream will release the turn.
+      generating.delete(sessionId);
+      throw error;
     }
-
-    const { pending, history } = outcome.point;
-
-    return streamSSE(c, async (stream) => {
-      await streamAssistantReply(
-        {
-          sessionId,
-          mode: pending.mode,
-          model: pending.model,
-          reasoning: pending.reasoning,
-          effort: pending.effort,
-          history: buildConversationHistory(history),
-        },
-        stream,
-      );
-    });
   })
   .post("/:id", submitValidator, async (c) => {
     const sessionId = c.req.param("id");
     const { content, mode, model, reasoning, effort } = c.req.valid("json");
 
-    const settings = resolveTurnSettings(findSupportedChatModel(model)!, { reasoning, effort });
-
-    const history = await db.transaction(async (tx) => {
-      const session = await tx.orm.public.Session.select("id", "title").first({
-        id: sessionId,
-      });
-      if (!session) return null;
-
-      await tx.orm.public.Message.create({
-        sessionId,
-        role: "USER",
-        status: "COMPLETE",
-        content,
-        model,
-        mode,
-        reasoning: settings.reasoning,
-        effort: settings.effort,
-      });
-
-      const title = nextTitle(session.title, content);
-      if (title !== session.title) {
-        await tx.orm.public.Session.where({ id: sessionId }).update({ title });
-      }
-
-      return await tx.orm.public.Message.where({ sessionId })
-        .select("role", "content")
-        .orderBy((m) => m.createdAt.asc())
-        .all();
-    });
-
-    if (!history) {
-      throw new HTTPException(404, { message: "Session not found" });
+    const chatModel = findSupportedChatModel(model);
+    if (!chatModel) {
+      throw new HTTPException(400, { message: `Unsupported model ${model}` });
     }
 
-    return streamSSE(c, async (stream) => {
-      await streamAssistantReply(
-        {
+    const settings = resolveTurnSettings(chatModel, { reasoning, effort });
+
+    beginTurn(sessionId);
+
+    try {
+      const history = await db.transaction(async (tx) => {
+        const session = await tx.orm.public.Session.select("id", "title").first({
+          id: sessionId,
+        });
+        if (!session) return null;
+
+        await tx.orm.public.Message.create({
           sessionId,
-          mode,
+          role: "USER",
+          status: "COMPLETE",
+          content,
           model,
+          mode,
           reasoning: settings.reasoning,
           effort: settings.effort,
-          history: buildConversationHistory(history),
-        },
-        stream,
-      );
-    });
+        });
+
+        const title = nextTitle(session.title, content);
+        if (title !== session.title) {
+          await tx.orm.public.Session.where({ id: sessionId }).update({ title });
+        }
+
+        return await tx.orm.public.Message.where({ sessionId })
+          .select(...HISTORY_FIELDS)
+          .orderBy((m) => m.createdAt.asc())
+          .all();
+      });
+
+      if (!history) {
+        throw new HTTPException(404, { message: "Session not found" });
+      }
+
+      return streamSSE(c, async (stream) => {
+        try {
+          await streamAssistantReply(
+            {
+              sessionId,
+              mode,
+              model,
+              reasoning: settings.reasoning,
+              effort: settings.effort,
+              history: buildConversationHistory(history),
+            },
+            stream,
+          );
+        } finally {
+          generating.delete(sessionId);
+        }
+      });
+    } catch (error) {
+      generating.delete(sessionId);
+      throw error;
+    }
   });
 
 export default app;

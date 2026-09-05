@@ -16,13 +16,22 @@ export const MESSAGE_FIELDS = [
   "createdAt",
 ] as const;
 
-export type StoredMessage = {
-  id: string;
+export const HISTORY_FIELDS = ["role", "content", "parts"] as const;
+
+export type HistoryMessage = {
   role: Role;
+  content: string;
+  parts: unknown;
+};
+
+export type StoredMessage = HistoryMessage & {
+  id: string;
+  sessionId: string;
   status: MessageStatus;
   model: string;
   mode: Mode;
   reasoning: Reasoning | null;
   effort: Effort | null;
-  content: string;
+  duration: number | null;
+  createdAt: string;
 };
