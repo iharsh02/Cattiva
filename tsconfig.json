@@ -1,7 +1,8 @@
 {
   // Whole-workspace config: `bunx tsc --noEmit` from the repo root checks every MCP server
   // and package, evals included. `apps/` stays out — the CLI needs its own JSX and path
-  // aliases, so it is checked through apps/cli/tsconfig.json instead.
+  // aliases, so it is checked through apps/cli/tsconfig.json instead. Nothing here reaches
+  // it, so `bun run typecheck` runs both configs; adding an app means adding it there too.
   // Per-package configs extend tsconfig.base.json and scope checks to one package.
   "extends": "./tsconfig.base.json",
   "include": ["mcp/*/src/**/*", "mcp/*/eval/**/*", "packages/*/src/**/*", "packages/*/*.ts", "*.ts"]

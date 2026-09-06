@@ -19,7 +19,7 @@
     "format:check": "oxfmt . --check",
     "lint": "oxlint . --deny-warnings",
     "lint:fix": "oxlint . --fix",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/cli/tsconfig.json",
     "prepare": "husky",
     "cli:dev": "bun run --watch apps/cli/src/index.tsx",
     "cli:start": "bun run apps/cli/src/index.tsx",
