@@ -10,6 +10,7 @@ export {
   findSupportedChatModel,
   hasEffortControl,
   hasReasoningControl,
+  replaysReasoning,
   resolveTurnSettings,
   type Effort,
   type ModelPricing,
@@ -20,15 +21,29 @@ export {
   type TurnSettings,
 } from "./model";
 
+export { effortSchema, reasoningSchema } from "./schema";
+
 export {
-  effortSchema,
-  reasoningSchema,
-  toolCallArgsSchema,
-  messagePartSchema,
-  messagePartsSchema,
-  chatStreamEventSchema,
-  type MessagePart,
-  type ChatStreamEvent,
-} from "./schema";
+  conversationRows,
+  roleToRow,
+  textFromMessage,
+  toUIMessage,
+  type CattivaUIMessage,
+  type CattivaUIPart,
+  type ChatMetadata,
+  type StoredMessageRow,
+} from "./message";
+
+export { modePolicy, type ModePolicy } from "./mode";
+
+export {
+  buildToolContracts,
+  readOnlyToolContracts,
+  toolInputSchemas,
+  ALL_TOOL_NAMES,
+  READ_ONLY_TOOL_NAMES,
+  type ToolContracts,
+  type ToolName,
+} from "./tools";
 
 export { DEFAULT_SESSION_TITLE, titleFromMessage } from "./session";

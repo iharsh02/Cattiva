@@ -135,6 +135,17 @@ export function findSupportedChatModel(modelId: string) {
   return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
 }
 
+/**
+ * Anthropic verifies thinking blocks against the tool calls they produced, so their
+ * models need prior reasoning replayed verbatim. Everyone else discards it, and
+ * sending it back is pure prompt cost.
+ */
+const REPLAYS_REASONING = new Set<SupportedProvider>(["anthropic"]);
+
+export function replaysReasoning(model: SupportedChatModel): boolean {
+  return REPLAYS_REASONING.has(model.provider);
+}
+
 export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "google/gemini-3.6-flash";
 
 const EFFORT_ABOVE_HIGH: readonly Effort[] = ["xhigh", "max"];

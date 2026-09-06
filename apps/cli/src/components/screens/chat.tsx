@@ -1,32 +1,32 @@
-import { BotMessage, ErrorMessage, ThinkingBlock, UserMessage } from "@/components/chat";
+import type { CattivaUIMessage } from "@cattiva/shared";
+import { textFromMessage } from "@cattiva/shared";
+import {
+  ApprovalPrompt,
+  BotMessage,
+  ErrorMessage,
+  pendingApproval,
+  UserMessage,
+} from "@/components/chat";
 import { Header } from "@/components/banner/header";
 import { StatusBar } from "@/components/banner/status-bar";
 import { InputBar } from "@/components/prompt/input-bar";
 import { Spinner } from "@/components/spinner";
-import { useModel } from "@/providers/model";
-import { useSession, type ChatMessage } from "@/providers/session";
+import { useSession } from "@/providers/session";
 import { useTheme } from "@/providers/theme";
 
-function MessageView({ message }: { message: ChatMessage }) {
-  if (message.role === "USER") {
-    return <UserMessage message={message.content} />;
-  }
-  if (message.role === "ERROR") {
-    return <ErrorMessage message={message.content} />;
+function MessageView({ message }: { message: CattivaUIMessage }) {
+  if (message.role === "user") {
+    return <UserMessage message={textFromMessage(message)} />;
   }
 
-  return (
-    <box flexDirection="column" width="100%">
-      {message.thinking ? <ThinkingBlock text={message.thinking} /> : null}
-      <BotMessage content={message.content} model={message.model} />
-    </box>
-  );
+  return <BotMessage message={message} />;
 }
 
 export function Chat() {
   const { colors } = useTheme();
-  const { model } = useModel();
-  const { messages, reply, thinking, busy, error } = useSession();
+  const { messages, busy, error, approve } = useSession();
+
+  const pending = pendingApproval(messages);
 
   return (
     <box flexDirection="column" flexGrow={1} width="100%" height="100%" paddingY={1} paddingX={2}>
@@ -40,9 +40,9 @@ export function Chat() {
           {messages.map((message) => (
             <MessageView key={message.id} message={message} />
           ))}
-          {thinking ? <ThinkingBlock text={thinking} /> : null}
-          {reply ? <BotMessage content={reply} model={model.id} /> : null}
-          {error ? <ErrorMessage message={error} /> : null}
+
+          {pending ? <ApprovalPrompt pending={pending} onAnswer={approve} /> : null}
+          {error ? <ErrorMessage message={error.message} /> : null}
         </box>
       </scrollbox>
 

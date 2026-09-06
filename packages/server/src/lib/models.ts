@@ -2,6 +2,7 @@ import { openrouter } from "@openrouter/ai-sdk-provider";
 
 import {
   findSupportedChatModel,
+  replaysReasoning,
   resolveTurnSettings,
   type Effort,
   type Reasoning,
@@ -22,6 +23,7 @@ export type ResolvedModel = {
   effort: Effort | null;
   providerOptions: ProviderOptions;
   maxOutputTokens: number;
+  replaysReasoning: boolean;
 };
 
 function openrouterOptions({ reasoning, effort }: TurnSettings): ProviderOptions {
@@ -49,6 +51,7 @@ function resolveSupportedChatModel(
     maxOutputTokens: model.maxOutputTokens,
     model: openrouter(model.id),
     providerOptions: openrouterOptions(settings),
+    replaysReasoning: replaysReasoning(model),
   };
 }
 

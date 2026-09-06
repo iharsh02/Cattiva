@@ -97,7 +97,6 @@ export function InputBar() {
     textarea.setText("");
   }, [session, toast]);
 
-  // Bound once; the ref below keeps the body current without rebinding every render.
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -108,9 +107,6 @@ export function InputBar() {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Read straight off the textarea: a command pasted in one burst submits before
-    // onContentChange has run, so render state does not yet know a command is being typed.
-    // Trimmed, or a trailing space would sink "/model " into the model as a chat message.
     const text = textarea.plainText.trim();
 
     if (isCommandInput(text)) {
@@ -194,8 +190,6 @@ export function InputBar() {
       </box>
       <box flexDirection="row" gap={1} paddingLeft={2}>
         <text fg={colors.dimSeparator}>tab to switch mode</text>
-        <text fg={colors.dimSeparator}>·</text>
-        <text fg={colors.dimSeparator}>ctrl+r for thinking</text>
         <text fg={colors.dimSeparator}>·</text>
         <text fg={colors.dimSeparator}>ctrl+c to quit</text>
       </box>

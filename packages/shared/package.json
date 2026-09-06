@@ -7,6 +7,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@cattiva/database": "workspace:*",
+    "ai": "^7.0.93",
     "zod": "^4.5.4"
   },
   "devDependencies": {
