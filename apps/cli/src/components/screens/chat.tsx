@@ -4,15 +4,14 @@ import {
   ApprovalPrompt,
   BotMessage,
   ErrorMessage,
+  InterruptedNotice,
   pendingApproval,
   UserMessage,
 } from "@/components/chat";
 import { Header } from "@/components/banner/header";
 import { StatusBar } from "@/components/banner/status-bar";
 import { InputBar } from "@/components/prompt/input-bar";
-import { Spinner } from "@/components/spinner";
 import { useSession } from "@/providers/session";
-import { useTheme } from "@/providers/theme";
 
 function MessageView({ message }: { message: CattivaUIMessage }) {
   if (message.role === "user") {
@@ -23,8 +22,7 @@ function MessageView({ message }: { message: CattivaUIMessage }) {
 }
 
 export function Chat() {
-  const { colors } = useTheme();
-  const { messages, busy, error, approve } = useSession();
+  const { messages, interrupted, error, approve } = useSession();
 
   const pending = pendingApproval(messages);
 
@@ -42,22 +40,12 @@ export function Chat() {
           ))}
 
           {pending ? <ApprovalPrompt pending={pending} onAnswer={approve} /> : null}
+          {interrupted ? <InterruptedNotice /> : null}
           {error ? <ErrorMessage message={error.message} /> : null}
         </box>
       </scrollbox>
 
       <box flexDirection="column" flexShrink={0} width="100%" paddingTop={1}>
-        <box
-          flexDirection="row"
-          justifyContent="space-between"
-          height={1}
-          paddingLeft={1}
-          width="100%"
-        >
-          <text fg={colors.dimSeparator}>/ for commands</text>
-          {busy ? <Spinner /> : null}
-        </box>
-
         <InputBar />
       </box>
     </box>

@@ -37,8 +37,10 @@ function opening(error: Error | undefined): UseChat {
   return {
     messages: [],
     busy: error === undefined,
+    interrupted: false,
     error,
     send: () => {},
+    stop: () => {},
     resume: async () => false,
     approve: () => {},
   };

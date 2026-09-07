@@ -8,6 +8,7 @@ import type { Command } from "@/types/commandMenu";
 import { useToast } from "@/providers/toast";
 import { LAYER, useKeyboardLayer } from "@/providers/keyboard-layer";
 import { useDialog } from "@/providers/dialog";
+import { Spinner } from "@/components/spinner";
 import { effortDots } from "@/components/dialogs/effort-picker";
 import { useSession } from "@/providers/session";
 import { useModel } from "@/providers/model";
@@ -88,7 +89,7 @@ export function InputBar() {
     if (session.busy) {
       toast.show({
         variant: "info",
-        message: "Still working on the last turn",
+        message: "Still working on the last turn — esc to interrupt",
       });
       return;
     }
@@ -124,13 +125,22 @@ export function InputBar() {
   };
 
   useKeyboard((key) => {
-    if (session.busy) return;
     if (!isTopLayer(LAYER.base)) return;
+
+    if (session.busy) {
+      if (key.name === "escape") {
+        key.preventDefault();
+        session.stop();
+      }
+      return;
+    }
+
     if (key.name === "tab") {
       key.preventDefault();
       toggleMode();
     }
   });
+
   useEffect(() => {
     setResponder(LAYER.base, () => {
       const textarea = textareaRef.current;
@@ -155,20 +165,40 @@ export function InputBar() {
           onExecute={handleCommandExecute}
         />
       )}
-      <box flexDirection="row" gap={1} paddingLeft={1}>
-        <text fg={mode === "BUILD" ? colors.primary : colors.planMode}>{mode}</text>
-        <text fg={colors.dimSeparator}>·</text>
-        {reasoning === null ? null : (
-          <>
-            <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
-              {reasoning === "on" ? "◉ thinking" : "○ no thinking"}
-            </text>
-            <text fg={colors.dimSeparator}>·</text>
-          </>
-        )}
-        {effort === null ? null : (
-          <text fg={colors.primary}>{`${effortDots(effort)} ${effort}`}</text>
-        )}
+      <box
+        flexDirection="row"
+        justifyContent="space-between"
+        alignItems="center"
+        gap={1}
+        paddingX={1}
+        width="100%"
+      >
+        <box flexDirection="row" gap={1}>
+          <text fg={mode === "BUILD" ? colors.primary : colors.planMode}>{mode}</text>
+          <text fg={colors.dimSeparator}>·</text>
+          {reasoning === null ? null : (
+            <>
+              <text fg={reasoning === "off" ? colors.dimSeparator : colors.thinking}>
+                {reasoning === "on" ? "◉ thinking" : "○ no thinking"}
+              </text>
+              <text fg={colors.dimSeparator}>·</text>
+            </>
+          )}
+          {effort === null ? null : (
+            <text fg={colors.primary}>{`${effortDots(effort)} ${effort}`}</text>
+          )}
+        </box>
+
+        <box flexDirection="row" alignItems="center" gap={1} flexShrink={0}>
+          {session.busy ? (
+            <>
+              <text fg={colors.dimSeparator}>esc to interrupt</text>
+              <Spinner />
+            </>
+          ) : (
+            <text fg={colors.dimSeparator}>/ for commands</text>
+          )}
+        </box>
       </box>
       <box
         flexDirection="row"

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat as useSdkChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -17,8 +17,10 @@ import { useModel } from "@/providers/model";
 export type UseChat = {
   messages: CattivaUIMessage[];
   busy: boolean;
+  interrupted: boolean;
   error: Error | undefined;
   send: (text: string) => void;
+  stop: () => void;
   resume: () => Promise<boolean>;
   approve: (toolCallId: string, approved: boolean) => void;
 };
@@ -26,6 +28,8 @@ export type UseChat = {
 const MAX_TOOL_STEPS = 30;
 
 const MAX_IDENTICAL_CALLS = 3;
+
+const INTERRUPTED_TOOL = "Interrupted before the tool reported a result.";
 
 type ToolPart = Extract<CattivaUIPart, ToolUIPart>;
 
@@ -78,6 +82,25 @@ function needsAnswer(messages: CattivaUIMessage[]): boolean {
 export function useChat(sessionId: string, initialMessages: CattivaUIMessage[]): UseChat {
   const { mode, model, reasoning, effort } = useModel();
 
+  // The SDK reports "ready" while a tool runs locally, so status alone reads idle mid-turn.
+  const running = useRef(new Map<string, ToolName>());
+  const [runningCount, setRunningCount] = useState(0);
+
+  const interruptedRef = useRef(false);
+  const [interrupted, setInterrupted] = useState(false);
+
+  const settle = useCallback((toolCallId: string) => {
+    if (!running.current.delete(toolCallId)) return false;
+
+    setRunningCount(running.current.size);
+    return true;
+  }, []);
+
+  const clearInterrupt = useCallback(() => {
+    interruptedRef.current = false;
+    setInterrupted(false);
+  }, []);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport<CattivaUIMessage>({
@@ -110,12 +133,19 @@ export function useChat(sessionId: string, initialMessages: CattivaUIMessage[]):
 
       debugLog("tool.start", { tool, toolCallId, mode });
 
+      running.current.set(toolCallId, tool);
+      setRunningCount(running.current.size);
+
       void executeLocalTool(tool, toolCall.input, mode)
         .then((output) => {
+          if (!settle(toolCallId)) return;
+
           debugLog("tool.output", { tool, toolCallId });
           chat.addToolOutput({ tool, toolCallId, output });
         })
         .catch((error: unknown) => {
+          if (!settle(toolCallId)) return;
+
           const errorText = error instanceof Error ? error.message : String(error);
           debugLog("tool.error", { tool, toolCallId, errorText });
           chat.addToolOutput({ tool, toolCallId, state: "output-error", errorText });
@@ -133,42 +163,84 @@ export function useChat(sessionId: string, initialMessages: CattivaUIMessage[]):
       }
     },
     sendAutomaticallyWhen: (options) =>
+      !interruptedRef.current &&
       shouldContinue(options.messages) &&
       (lastAssistantMessageIsCompleteWithToolCalls(options) ||
         lastAssistantMessageIsCompleteWithApprovalResponses(options)),
   });
 
+  useEffect(() => {
+    return () => {
+      void chat.stop();
+    };
+  }, [chat.stop]);
+
   const send = useCallback(
     (text: string) => {
+      clearInterrupt();
       void chat.sendMessage({ text });
     },
-    [chat],
+    [chat, clearInterrupt],
   );
+
+  const stop = useCallback(() => {
+    const streaming = chat.status === "submitted" || chat.status === "streaming";
+    if (!streaming && running.current.size === 0) return;
+
+    debugLog("chat.interrupt", { status: chat.status, tools: running.current.size });
+
+    interruptedRef.current = true;
+    setInterrupted(true);
+
+    void chat.stop();
+
+    for (const [toolCallId, tool] of running.current) {
+      chat.addToolOutput({ tool, toolCallId, state: "output-error", errorText: INTERRUPTED_TOOL });
+    }
+
+    running.current.clear();
+    setRunningCount(0);
+  }, [chat]);
 
   const resume = useCallback(async () => {
     if (!needsAnswer(chat.messages)) return false;
 
+    clearInterrupt();
     await chat.regenerate();
     return true;
-  }, [chat]);
+  }, [chat, clearInterrupt]);
 
   const approve = useCallback(
     (approvalId: string, approved: boolean) => {
       debugLog("tool.approval", { approvalId, approved });
+
+      clearInterrupt();
       chat.addToolApprovalResponse({ id: approvalId, approved });
     },
-    [chat],
+    [chat, clearInterrupt],
   );
 
   return useMemo(
     () => ({
       messages: chat.messages,
-      busy: chat.status === "submitted" || chat.status === "streaming",
+      busy: chat.status === "submitted" || chat.status === "streaming" || runningCount > 0,
+      interrupted,
       error: chat.error,
       send,
+      stop,
       resume,
       approve,
     }),
-    [chat.messages, chat.status, chat.error, send, resume, approve],
+    [
+      chat.messages,
+      chat.status,
+      chat.error,
+      runningCount,
+      interrupted,
+      send,
+      stop,
+      resume,
+      approve,
+    ],
   );
 }

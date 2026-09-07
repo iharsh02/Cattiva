@@ -126,6 +126,8 @@ const app = new Hono().post("/", submitValidator, async (c) => {
     activeTools: policy.activeTools,
     toolApproval: policy.approvals,
 
+    abortSignal: c.req.raw.signal,
+
     providerOptions: resolved.providerOptions,
     maxOutputTokens: resolved.maxOutputTokens,
     experimental_transform: SMOOTHING,
@@ -136,6 +138,9 @@ const app = new Hono().post("/", submitValidator, async (c) => {
 
   return result.toUIMessageStreamResponse<CattivaUIMessage>({
     originalMessages: nextMessages,
+    consumeSseStream({ stream }) {
+      void stream.pipeTo(new WritableStream()).catch(() => {});
+    },
     messageMetadata({ part }) {
       if (part.type === "start") return settled;
       if (part.type !== "finish") return undefined;
