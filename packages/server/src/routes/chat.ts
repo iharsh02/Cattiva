@@ -138,6 +138,7 @@ const app = new Hono().post("/", submitValidator, async (c) => {
 
   return result.toUIMessageStreamResponse<CattivaUIMessage>({
     originalMessages: nextMessages,
+    generateMessageId: () => crypto.randomUUID(),
     consumeSseStream({ stream }) {
       void stream.pipeTo(new WritableStream()).catch(() => {});
     },

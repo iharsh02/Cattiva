@@ -72,15 +72,14 @@ While a reply is still being thought about, the thinking shows itself.
 
 Every model is reached through OpenRouter, so one `OPENROUTER_API_KEY` covers all of them.
 
-| Model                                    | Thinking             |
-| ---------------------------------------- | -------------------- |
-| `anthropic/claude-sonnet-4.6`            | effort, up to `max`  |
-| `anthropic/claude-opus-4.6`              | effort, up to `max`  |
-| `anthropic/claude-opus-5`                | effort, up to `max`  |
-| `google/gemini-2.5-flash`                | on/off only          |
-| `google/gemini-3.6-flash`                | effort, up to `high` |
-| `qwen/qwen3-coder-flash`                 | none                 |
-| `nvidia/nemotron-3-super-120b-a12b:free` | effort, free         |
+| Model                                                | Thinking               |
+| ---------------------------------------------------- | ---------------------- |
+| `nvidia/nemotron-3-super-120b-a12b:free`             | effort, up to `medium` |
+| `nvidia/nemotron-3-ultra-550b-a55b:free`             | effort, up to `high`   |
+| `nvidia/nemotron-3.5-lightning:free`                 | on/off only            |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | on/off only            |
+| `google/gemma-4-31b-it:free`                         | on/off only            |
+| `google/gemma-4-26b-a4b-it:free`                     | on/off only            |
 
 A model that offers no thinking has no reasoning or effort sent for it at all.
 
@@ -92,14 +91,15 @@ Two separate settings, because the providers treat them separately:
   thoroughness, how much it says, and, once there are tools, how many calls it makes.
 
 Each model declares which of these it actually offers, and only those appear — a setting the
-provider does not have is not invented for it. `xhigh` arrived with Opus 4.7, so the 4.6-era
-models do not list it; Google has no effort parameter of any kind, so on Gemini there is no
-effort control at all and `/effort` says so. Where both exist they are resolved together, since
-Opus 5 refuses to answer without thinking above `high` effort.
+provider does not have is not invented for it. Only the two larger Nemotrons take an effort
+parameter at all, and neither goes past `high`, so `xhigh` and `max` never show up in
+`/effort`. Both settings are resolved together, because a model can require thinking to be on
+before it will accept the effort it was asked for.
+
+Every model here is free, so the whole list runs on an OpenRouter key with no credit on it.
 
 Replies are re-cut into words before they leave the server. Providers hand back whole
-sentences at a time — Gemini answers a short question in about five chunks — which arrives as
-visible slabs rather than streaming text.
+sentences at a time, which arrives as visible slabs rather than streaming text.
 
 ---
 

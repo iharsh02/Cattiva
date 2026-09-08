@@ -29,90 +29,6 @@ type SupportedChatModelDefinition = {
 
 export const SUPPORTED_CHAT_MODELS = [
   {
-    id: "anthropic/claude-sonnet-4.6",
-    provider: "anthropic",
-    maxOutputTokens: 128000,
-    pricing: {
-      inputUsdPerMillionTokens: 3,
-      outputPerMillionTokens: 15,
-    },
-    reasoning: REASONING,
-    defaultReasoning: "on",
-    effort: ["low", "medium", "high", "max"],
-    defaultEffort: "high",
-    requiresReasoningForHighEffort: false,
-  },
-  {
-    id: "anthropic/claude-opus-4.6",
-    provider: "anthropic",
-    maxOutputTokens: 128000,
-    pricing: {
-      inputUsdPerMillionTokens: 5,
-      outputPerMillionTokens: 25,
-    },
-    reasoning: REASONING,
-    defaultReasoning: "on",
-    effort: ["low", "medium", "high", "max"],
-    defaultEffort: "high",
-    requiresReasoningForHighEffort: false,
-  },
-  {
-    id: "anthropic/claude-opus-5",
-    provider: "anthropic",
-    maxOutputTokens: 128000,
-    pricing: {
-      inputUsdPerMillionTokens: 5,
-      outputPerMillionTokens: 25,
-    },
-    reasoning: REASONING,
-    defaultReasoning: "on",
-    effort: EFFORT_LEVELS,
-    defaultEffort: "high",
-    requiresReasoningForHighEffort: true,
-  },
-  {
-    id: "google/gemini-2.5-flash",
-    provider: "google",
-    maxOutputTokens: 65535,
-    pricing: {
-      inputUsdPerMillionTokens: 0.3,
-      outputPerMillionTokens: 2.5,
-    },
-    reasoning: REASONING,
-    defaultReasoning: "off",
-    effort: [],
-    defaultEffort: null,
-    requiresReasoningForHighEffort: false,
-  },
-  {
-    id: "google/gemini-3.6-flash",
-    provider: "google",
-    maxOutputTokens: 65536,
-    pricing: {
-      inputUsdPerMillionTokens: 0.75,
-      outputPerMillionTokens: 3.75,
-    },
-    reasoning: REASONING,
-    defaultReasoning: "on",
-    effort: ["low", "medium", "high"],
-    defaultEffort: "medium",
-    requiresReasoningForHighEffort: false,
-  },
-  {
-    id: "qwen/qwen3-coder-flash",
-    provider: "qwen",
-    maxOutputTokens: 65536,
-    pricing: {
-      inputUsdPerMillionTokens: 0.195,
-      outputPerMillionTokens: 0.975,
-    },
-    reasoning: [],
-    defaultReasoning: null,
-    effort: [],
-    defaultEffort: null,
-    requiresReasoningForHighEffort: false,
-  },
-  {
     id: "nvidia/nemotron-3-super-120b-a12b:free",
     provider: "nvidia",
     maxOutputTokens: 235929,
@@ -124,6 +40,76 @@ export const SUPPORTED_CHAT_MODELS = [
     defaultReasoning: "on",
     effort: ["low", "medium"],
     defaultEffort: "medium",
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    provider: "nvidia",
+    maxOutputTokens: 65536,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "on",
+    effort: ["low", "medium", "high"],
+    defaultEffort: "medium",
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "nvidia/nemotron-3.5-lightning:free",
+    provider: "nvidia",
+    maxOutputTokens: 65536,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "on",
+    effort: [],
+    defaultEffort: null,
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    provider: "nvidia",
+    maxOutputTokens: 65536,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "on",
+    effort: [],
+    defaultEffort: null,
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    provider: "google",
+    maxOutputTokens: 32768,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "off",
+    effort: [],
+    defaultEffort: null,
+    requiresReasoningForHighEffort: false,
+  },
+  {
+    id: "google/gemma-4-26b-a4b-it:free",
+    provider: "google",
+    maxOutputTokens: 32768,
+    pricing: {
+      inputUsdPerMillionTokens: 0,
+      outputPerMillionTokens: 0,
+    },
+    reasoning: REASONING,
+    defaultReasoning: "off",
+    effort: [],
+    defaultEffort: null,
     requiresReasoningForHighEffort: false,
   },
 ] as const satisfies readonly SupportedChatModelDefinition[];
@@ -146,7 +132,7 @@ export function replaysReasoning(model: SupportedChatModel): boolean {
   return REPLAYS_REASONING.has(model.provider);
 }
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "google/gemini-3.6-flash";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "nvidia/nemotron-3-super-120b-a12b:free";
 
 const EFFORT_ABOVE_HIGH: readonly Effort[] = ["xhigh", "max"];
 
