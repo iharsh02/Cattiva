@@ -12,6 +12,7 @@
     "db:init": "prisma db init",
     "db:migrate": "prisma db migrate",
     "db:schema": "prisma db schema",
+    "db:studio": "cd ../.. && set -a && . ./.env && set +a && bunx prisma@7.10.0 studio --url \"$DATABASE_URL\" --port 5555",
     "db:update": "prisma db update",
     "db:verify": "prisma db verify",
     "migration:list": "prisma migration list",

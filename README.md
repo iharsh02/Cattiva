@@ -228,6 +228,7 @@ bun run cli:dev      # CLI with hot reload
 bun run memory:dev   # memory server directly on stdio
 bun run memory:eval  # run the LoCoMo eval
 bun db:verify        # check the live schema matches the contract
+bun db:studio        # browse the data in Prisma Studio on :5555
 ```
 
 [`.mcp.json`](.mcp.json) is checked in and points at the **local source**, so opening this

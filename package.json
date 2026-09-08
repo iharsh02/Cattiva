@@ -36,6 +36,7 @@
     "db:update": "bun run --filter @cattiva/database db:update",
     "db:verify": "bun run --filter @cattiva/database db:verify",
     "db:schema": "bun run --filter @cattiva/database db:schema",
+    "db:studio": "bun run --filter @cattiva/database db:studio",
     "db:migrate": "bun run --filter @cattiva/database db:migrate",
     "db:migration:plan": "bun run --filter @cattiva/database migration:plan",
     "db:migration:status": "bun run --filter @cattiva/database migration:status",
